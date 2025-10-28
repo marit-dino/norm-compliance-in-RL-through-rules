@@ -1,0 +1,1 @@
+This folder contains temporary files generated when using telingo to solve an instance.

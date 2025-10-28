@@ -1,0 +1,12 @@
+[tool.poetry]
+name = "legible"
+version = "1.0.0"
+description = "legible"
+authors = ["TODO"]
+packages = [{ include = "legible", from = "src" }]
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

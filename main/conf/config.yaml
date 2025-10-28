@@ -1,7 +1,10 @@
 env:
-  size: small
-  feature-extractor:
+  name: BerkeleyPacman-v0
+  level: smallClassic
+  feature_extractor: complete  
 
 training:
-  episodes: 1000_000
+  steps: 1000_000
+  algorithm: dqn
+
 

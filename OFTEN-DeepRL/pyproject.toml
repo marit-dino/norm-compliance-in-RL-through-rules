@@ -1,0 +1,15 @@
+[project]
+name = "oftendeeprl"
+version = "1.0.0"
+description = "TODO"
+authors = [{name = "todo", email = "todo@example.com"}]
+packages = [{ include = "oftendeeprl", from = "src" }]
+
+
+[dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,8 @@
+<routes>
+    <vType id="ambulance" accel="3.0" decel="6.0" sigma="0" length="5" maxSpeed="30" color="0,0,255"/>
+    <route id="route_ns" edges="n_t t_s"/>
+    <route id="route_we" edges="w_t t_e"/>
+    <flow id="flow_ns" route="route_ns" begin="0" end="100000" probability="0.01" departSpeed="max" departPos="base" departLane="best"/>
+    <flow id="ambulance_flow_we" type="ambulance" route="route_we" begin="0" end="100000" probability="0.01" departSpeed="max" departPos="base" departLane="best"/>
+    <flow id="flow_we" route="route_we" begin="0" end="100000" probability="0.8" departSpeed="max" departPos="base" departLane="best"/>
+</routes>

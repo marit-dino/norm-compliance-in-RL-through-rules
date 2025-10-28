@@ -1,3 +1,4 @@
 .venv
-legible/*
-OFTEN-DeepRL/*
+poetry*
+*.log
+*/outputs/*
