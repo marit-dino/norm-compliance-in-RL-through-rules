@@ -1,0 +1,7 @@
+env:
+  size: small
+  feature-extractor:
+
+training:
+  episodes: 1000_000
+
