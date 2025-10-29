@@ -1,4 +1,7 @@
 .venv
 poetry*
 *.log
-*/outputs/*
+outputs
+pickles
+tb_log
+__pycache__

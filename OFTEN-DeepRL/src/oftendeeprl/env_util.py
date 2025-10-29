@@ -1,15 +1,15 @@
 import torch
 
-from gym_gardener.feature_extractors import MinigridFeaturesExtractorNonDict
-from gym_gardener.gym_gardener import GardenerEnv
-from gym_gardener.wrappers import create_gardener_env
-from sb3_ext.gardener_helper import GardenerHelper
-from sb3_ext.pacman_helper import PacmanClingoHelper
-from sb3_ext.sumo_helper import SumoHelper
+from .gym_gardener.feature_extractors import MinigridFeaturesExtractorNonDict
+from .gym_gardener.gym_gardener import GardenerEnv
+from .gym_gardener.wrappers import create_gardener_env
+from .sb3_ext.gardener_helper import GardenerHelper
+from .sb3_ext.pacman_helper import PacmanClingoHelper
+from .sb3_ext.sumo_helper import SumoHelper
 # from gym_gardener.gym_gardener import GardenerEnv
 # from gym_gardener.train_gardener import create_garden_env
-from train_pacman import create_pacman_env
-from sumo_single_intersection import create_sumo_env
+from .train_pacman import create_pacman_env
+#from .sumo_single_intersection import create_sumo_env
 from stable_baselines3.common.env_util import make_vec_env
 
 def get_gym_to_action_names(env_name) :

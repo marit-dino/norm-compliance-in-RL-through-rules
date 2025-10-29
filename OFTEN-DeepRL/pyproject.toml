@@ -1,13 +1,23 @@
-[project]
+[tool.poetry]
 name = "oftendeeprl"
 version = "1.0.0"
 description = "TODO"
-authors = [{name = "todo", email = "todo@example.com"}]
-packages = [{ include = "oftendeeprl", from = "src" }]
+authors = ["todo"]
+packages = [
+    { include = "oftendeeprl", from = "src" },
+    { include = "gym_pacman", from = "src/oftendeeprl" }
+    ]
 
 
-[dependencies]
+[tool.poetry.dependencies]
 python = "^3.11"
+gymnasium = "1.1.1"
+torch = "2.6.0"
+stable_baselines3 = "2.6.0"
+tensorboard = "2.19.0"
+clingo = "5.7.1"
+
+
 
 
 [build-system]

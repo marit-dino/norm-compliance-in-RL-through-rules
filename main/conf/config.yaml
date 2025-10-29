@@ -4,7 +4,10 @@ env:
   feature_extractor: complete  
 
 training:
-  steps: 1000_000
+  steps_initial: 1000_000
+  steps_norm: 1000_000
   algorithm: dqn
+  ng_margin: 50
+  norm_violation_filtering: True
 
-
+norm: 2-5-True

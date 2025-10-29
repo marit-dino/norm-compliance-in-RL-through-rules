@@ -1,14 +1,14 @@
 import math
 
-import gym_pacman
+from .gym_pacman import *
 import gymnasium as gym
 import torch
 from gymnasium.wrappers import TransformReward
 from stable_baselines3 import DQN
 from stable_baselines3.common.env_util import make_vec_env
 
-from util import save_model
-from sb3_ext.DQNWithNStepReturns import DQNWithNStepReturns
+from .util import save_model
+from .sb3_ext.DQNWithNStepReturns import DQNWithNStepReturns
 
 
 def train(env_name,algo,feature_extractor, n_steps,level, tb_name = None):
@@ -64,10 +64,7 @@ def train_pacman(algo,env_name, steps, level,feature_extractor, run_afterwards=F
 
     model = train(env_name,algo,feature_extractor = feature_extractor, n_steps=steps,
                       tb_name = tb_name, level = level)
-    save_model(model_name, model)
-    if run_afterwards:
-        input("press")
-        run_trained_model(env_name,model,feature_extractor = feature_extractor, level=level)
+    return save_model(model_name, model)
 
 if __name__ == "__main__":
     import sys

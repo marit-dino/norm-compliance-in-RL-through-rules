@@ -31,6 +31,7 @@ def save_model(model_name, model, exact_match = False):
     effective_name = find_file_name(model_name,"zip",next=True) if not exact_match else model_name
     print(f"Saving {effective_name}")
     model.save(effective_name)
+    return effective_name
 
 def find_file_name(name,suffix,next=False):
     i = 1
