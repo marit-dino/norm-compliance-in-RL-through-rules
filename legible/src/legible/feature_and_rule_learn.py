@@ -3,13 +3,11 @@ import sys
 import gymnasium.spaces
 import numpy as np
 import torch
-import highway_env
-from hw.hw_util import HwDiscretizer
-from rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
-from rule_learning.feature_detection import detect_features, get_most_important_corr_features
-from rule_learning.learnRules import extract_features_from_obs, get_rules
-from rule_learning.util import save_pickle, load_model
-from env_util import create_environment_and_modelname
+from .rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
+from .rule_learning.feature_detection import detect_features, get_most_important_corr_features
+from .rule_learning.learnRules import extract_features_from_obs, get_rules
+from .rule_learning.util import save_pickle, load_model
+from legible.env_util import create_environment_and_modelname, create_environment_and_modelname_for_oftendeeprl
 
 from shield.shields import AspShield
 

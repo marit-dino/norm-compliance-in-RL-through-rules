@@ -1,6 +1,6 @@
 import math
 
-from .gym_pacman import *
+from oftendeeprl.gym_pacman import *
 import gymnasium as gym
 import torch
 from gymnasium.wrappers import TransformReward

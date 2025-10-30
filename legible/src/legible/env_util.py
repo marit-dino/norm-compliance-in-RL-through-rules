@@ -1,8 +1,6 @@
 import copy
 
-from hw.hw_util import env_kwargs, create_hw_env
-from mg.env_utils import create_mg_env
-from train_pacman import create_pacman_env
+from legible.train_pacman import create_pacman_env
 
 
 def create_environment_and_modelname(algo_name, env_name, mode, steps, feature_extractor=None):

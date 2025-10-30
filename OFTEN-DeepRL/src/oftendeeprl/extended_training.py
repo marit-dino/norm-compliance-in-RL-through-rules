@@ -1,16 +1,12 @@
 from stable_baselines3 import DQN
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement
-from .env_util import get_policy_kwargs_dqn, get_gym_to_action_names, get_norm_helper, get_garden_level_name, get_sumo_level_name
-from .gym_gardener.wrappers import create_gardener_env
-from .sb3_ext.gardener_helper import GardenerHelper
+from .env_util import get_policy_kwargs_dqn, get_gym_to_action_names, get_norm_helper
 from .sb3_ext.pacman_helper import PacmanClingoHelper
-from .sb3_ext.sumo_helper import SumoHelper
 from .util import save_model, find_file_name
 from .sb3_ext.clingoHelper import ClingoHelper
 from .sb3_ext.DQfD import RuleDQfD
 from .train_pacman import create_pacman_env, run_trained_model
-#from .sumo_single_intersection import create_sumo_env
 
 def ext_train(env_name, base_model_name, feature_extractor, n_steps, level, norm_helper,
               exact_model_number=None,
@@ -84,7 +80,7 @@ def ext_train(env_name, base_model_name, feature_extractor, n_steps, level, norm
                          add_expert_loss = add_expert_loss,
                          final_shield_rate = final_shield_rate ,verbose =1,
                          tensorboard_log=tb_path, policy_kwargs=policy_kwargs_dqn,
-                    batch_size=256, buffer_size=50_000, exploration_fraction=0.5,
+                         batch_size=256, buffer_size=50_000, exploration_fraction=0.5,
                          gamma = 0.95,gradient_steps=-1, margin = ng_margin
                    )
     else:
