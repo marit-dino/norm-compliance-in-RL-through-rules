@@ -10,7 +10,6 @@ import math
 import pandas as pd
 from scipy.stats import chi2_contingency
 
-from hw.hw_util import HwDiscretizer
 from rule_learning.util import predict_act
 
 NEG_INFTY = -1e10

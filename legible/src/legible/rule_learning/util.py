@@ -91,7 +91,7 @@ def load_dqn_model(model_name, exact_match = False, env = None):
 def load_model(model_path,algo_name, exact_match = False,env= None):
     if algo_name == "ppo":
         return load_ppo_model(model_path,exact_match = exact_match)
-    elif algo_name == "dqn":
+    elif algo_name == "dqn" or algo_name == "norm_guided_dqn":
         return load_dqn_model(model_path, exact_match=exact_match,env=env)
     else:
         raise Exception("Unsupported")
