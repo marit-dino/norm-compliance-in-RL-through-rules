@@ -3,8 +3,14 @@ name = "legible"
 version = "1.0.0"
 description = "legible"
 authors = ["TODO"]
-packages = [{ include = "legible", from = "src" }]
+packages = [{ include = "legible", from = "src" },
+            { include = "rule_learning", from = "src/legible" }
+]
 
+[tool.poetry.dependencies]
+python = "^3.11"
+scikit-learn = "1.6.1"
+lime = "0.2.0.1"
 
 
 [build-system]
