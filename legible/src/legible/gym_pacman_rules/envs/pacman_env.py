@@ -6,7 +6,7 @@ import numpy as np
 headless = True
 
 from .featureExtractors import ExtendedExtractor6, features_dict_to_array, ExtendedExtractor7, ExtendedExtractor8, \
-    ExtendedExtractor9
+    ExtendedExtractor9, DeepRLCompleteExtractor
 # from scipy.special import kwargs
 
 if not headless:
@@ -332,6 +332,9 @@ class PacmanEnv(gymnasium.Env):
             self.observation_space = self.features.get_obs_space(nr_ghosts)
         elif self.features == "extended-9":
             self.features = ExtendedExtractor9(height=self.layout.height,width=self.layout.width)
+            self.observation_space = self.features.get_obs_space(nr_ghosts)
+        elif self.features == "complete" :
+            self.features = DeepRLCompleteExtractor(height=self.layout.height, width=self.layout.width)
             self.observation_space = self.features.get_obs_space(nr_ghosts)
         else:
             raise Exception(f"Feature extractor '{self.features}' Not implemented")

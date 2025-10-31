@@ -26,7 +26,7 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
     obs_t = obs_t.to(action_tensor.device)
     if algo_name == "ppo":
         estimated_value, act_logits,_ = policy.evaluate_actions(obs_t,action_tensor) #.log_prob(action_tensor)
-    elif algo_name == "dqn":
+    elif "dqn" in algo_name:
         q_values = policy.q_net(obs_t)
         act_logits = q_values # not logits but treat them as such for now
         estimated_value = torch.max(act_logits)
@@ -46,7 +46,7 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
 
         if algo_name == "ppo":
             estimated_value, act_logits, _ = policy.evaluate_actions(obs_t, action_tensor)  # .log_prob(action_tensor)
-        elif algo_name == "dqn":
+        elif "dqn" in algo_name:
             q_values = policy.q_net(obs_t)
             act_logits = q_values  # not logits but treat them as such for now
             estimated_value = torch.max(act_logits)

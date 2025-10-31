@@ -17,6 +17,8 @@ import math
 import queue
 from functools import cache, lru_cache
 
+from collections import defaultdict
+
 import gymnasium.spaces
 import numpy as np
 from PIL.ImageChops import offset
@@ -568,9 +570,12 @@ class ExtendedExtractor8(FeatureExtractor):
         # high[other_obs_size:] = 3 + 4 + 4
         return gymnasium.spaces.Box(low=low,high=high)
 
-def add_direction_ohe(features, direction, feature_name):
+def add_direction_ohe(features, direction, feature_name,with_out_stop=False):
     for d in Actions._directions.keys():
-        features[f"{feature_name}-{d}"] = d == direction
+        if with_out_stop and d == Directions.STOP:
+            continue
+        else:
+            features[f"{feature_name}-{d}"] = d == direction
 
 def add_angle_direction_ohe(features, angle, feature_name):
     for d in range(0,9):
@@ -662,3 +667,118 @@ class SimpleExtractor(FeatureExtractor):
             features["closest-food"] = float(dist) / (walls.width * walls.height)
         features.divideAll(10.0)
         return features
+
+# from OFTEN-DeepRL
+class DeepRLCompleteExtractor(FeatureExtractor):
+    def __init__(self, height, width):
+        super().__init__(height, width)
+        self.legal_neighbor_cache = dict()
+
+    def getFeatures(self, state, action):
+        # extract the grid of food and wall locations and get the ghost locations
+        food = state.getFood()
+        walls = state.getWalls()
+        ghosts = state.getGhostStates()
+        n_ghosts = len(ghosts) 
+        features = Counter()
+        max_dist = self.height + self.width 
+
+        # compute the location of pacman after he takes the action
+        x, y = state.getPacmanPosition()
+
+        dist_dir = closestFood((x, y), food, walls, legal_neighbor_cache=self.legal_neighbor_cache,
+                           return_dir=True)
+        if dist_dir is not None:
+            dist,food_dir = dist_dir
+            features[f"closest-food"] = dist / max_dist # c
+            add_direction_ohe(features, food_dir, f"closest-food-dir",with_out_stop=True) # c
+        else:
+            features[f"closest-food"] = 1 # c
+            add_direction_ohe(features, Directions.STOP, f"closest-food-dir",with_out_stop=True)
+        x_int, y_int = int(x + 0.5), int(y + 0.5)
+        for dir, vec in Actions._directionsAsList:
+            if dir == Directions.STOP:
+                continue
+            dx, dy = vec
+            next_y = y_int + dy
+            next_x = x_int + dx
+            if next_x < walls.width and next_y < walls.height:
+                if not walls[next_x][next_y]:
+                    features[f"poss-dir-{dir}"] = 1 #c
+                else:
+                    features[f"poss-dir-{dir}"] = 0 #c
+
+        ghost_distances = defaultdict(list)
+        for i,g in enumerate(ghosts):
+            is_scared = 1 if g.isScared() else 0
+            features[f"ghost-{i}-scared"] = is_scared # c
+            features[f"ghost-{i}-scaredtime"] = g.scaredTimer / SCARED_TIME # c
+            g_dist, g_dir = ghostDistance((x,y),g.getPosition(),walls,legal_neighbor_cache = self.legal_neighbor_cache,return_dir=True)
+            ghost_distances["curr"].append((g_dist,g.isScared()))
+            features[f"ghost-{i}-dist"] = g_dist / max_dist # c
+
+            add_direction_ohe(features,g_dir if g_dir is not None else Directions.STOP,f"ghost-{i}-dir",with_out_stop=True)
+            add_direction_ohe(features,g.getDirection(),f"ghost-{i}-heading",with_out_stop=True) # c
+            for action in Actions._directions.keys():
+                if action == Directions.STOP:
+                    continue
+                dx, dy = Actions.directionToVector(action)
+                next_x, next_y = int(x + dx), int(y + dy)
+
+                g_dist, g_dir = ghostDistance((next_x, next_y), g.getPosition(), walls,
+                                              legal_neighbor_cache=self.legal_neighbor_cache, return_dir=True)
+                ghost_distances[action].append((g_dist,g.isScared()))
+
+        features["#-of-non-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if not sc and d <= 1]) 
+        features["#-of-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if sc and d <= 1]) # c
+        features["#-of-non-scared-ghosts-le3-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if not sc and d <= 3])
+        features["#-of-scared-ghosts-le3-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if sc and d <= 3])
+
+
+        for action in Actions._directions.keys():
+            if action == Directions.STOP:
+                continue
+
+            dx, dy = Actions.directionToVector(action)
+            next_x, next_y = int(x + dx), int(y + dy)
+            features[f"#-of-non-scared-ghosts-1-step-away-{action}"] = (len(
+                [(d, sc) for (d, sc) in ghost_distances[action] if not sc and d <= 1]) -features["#-of-non-scared-ghosts-1-step-away"])/n_ghosts
+            features[f"#-of-scared-ghosts-1-step-away-{action}"] = (len(
+                [(d, sc) for (d, sc) in ghost_distances[action] if sc and d <= 1]) -features["#-of-scared-ghosts-1-step-away"])/n_ghosts
+            features[f"#-of-non-scared-ghosts-le3-step-away-{action}"] = (len(
+                [(d, sc) for (d, sc) in ghost_distances[action] if not sc and d <= 3]) -features["#-of-non-scared-ghosts-le3-step-away"])/n_ghosts
+            features[f"#-of-scared-ghosts-le3-step-away-{action}"] = (len(
+                [(d, sc) for (d, sc) in ghost_distances[action] if sc and d <= 3]) - features["#-of-scared-ghosts-le3-step-away"])/n_ghosts
+
+            if action == Directions.STOP:
+                continue
+            dist = closestFood((next_x, next_y), food, walls, legal_neighbor_cache=self.legal_neighbor_cache,
+                               return_dir=False)
+            if dist is not None:
+                # make the distance a number less than one otherwise the update
+                # will diverge wildly
+                features[f"closest-food-{action}"] = (dist - features[f"closest-food"]) / max_dist
+            else:
+                features[f"closest-food-{action}"] = 1 # self.height + self.width
+
+
+        features["#-of-non-scared-ghosts-1-step-away"] /=n_ghosts
+        features["#-of-scared-ghosts-1-step-away"] /=n_ghosts
+        features["#-of-non-scared-ghosts-le3-step-away"] /=n_ghosts
+        features["#-of-scared-ghosts-le3-step-away"]/=n_ghosts
+        cap_dist,cap_dir = closestCapsule((x, y),state.getCapsules(),walls,legal_neighbor_cache = self.legal_neighbor_cache)
+        features["closest-capsule-dist"] = cap_dist # c
+
+        add_direction_ohe(features, cap_dir, "closest-capsule-dir",with_out_stop=True) # c
+ 
+        features["x"] = x / self.width # c
+        features["y"] = y / self.height # c
+
+        return features
+    
+    def get_obs_space(self,nr_ghosts):
+        other_obs_size = 40
+        obs_size = other_obs_size + nr_ghosts * 11
+        low = np.zeros(obs_size)
+        high = np.ones(obs_size)
+        return gymnasium.spaces.Box(low=low,high=high)
