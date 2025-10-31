@@ -1,4 +1,4 @@
-import gym_pacman
+import gym_pacman_rules
 import gymnasium as gym
 import torch
 from gymnasium.wrappers import TransformReward
@@ -42,6 +42,7 @@ def train(env_name,algo,feature_extractor, n_steps,level, tb_name = None):
 
 
 def create_pacman_env(env_name,feature_extractor, level, render_mode,scale = False):
+    env_name = env_name + "-legible"
     env = gym.make(env_name, layout=level,features=feature_extractor,render_mode=render_mode)
     if scale:
         env = TransformReward(env, lambda r: 0.01*r)

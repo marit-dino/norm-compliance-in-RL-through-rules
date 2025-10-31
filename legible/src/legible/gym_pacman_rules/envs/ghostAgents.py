@@ -10,13 +10,13 @@
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
-from gym_pacman.envs.util import Counter
-from gym_pacman.envs.game import Agent
-from gym_pacman.envs.game import Actions
-from gym_pacman.envs.game import Directions
+from gym_pacman_rules.envs.util import Counter
+from gym_pacman_rules.envs.game import Agent
+from gym_pacman_rules.envs.game import Actions
+from gym_pacman_rules.envs.game import Directions
 import random
-from gym_pacman.envs.util import manhattanDistance,chooseFromDistribution
-import gym_pacman.envs.util
+from gym_pacman_rules.envs.util import manhattanDistance,chooseFromDistribution
+import gym_pacman_rules.envs.util
 
 class GhostAgent( Agent ):
     def __init__( self, index ):

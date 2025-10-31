@@ -39,6 +39,7 @@ def sign(r):
     return r / abs(r)
 
 def create_pacman_env(env_name,feature_extractor, level, render_mode,scale = False):
+    env_name = env_name + "-oftendeeprl"
     env = gym.make(env_name, layout=level,features=feature_extractor,render_mode=render_mode)
     if scale:
         env = TransformReward(env, lambda r: sign(r) * math.log(abs(r)))

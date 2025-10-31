@@ -1,6 +1,6 @@
 from PIL import Image
 import gym
-import gym_pacman
+import gym_pacman_rules
 import time
 
 env = gym.make('BerkeleyPacmanPO-v0')

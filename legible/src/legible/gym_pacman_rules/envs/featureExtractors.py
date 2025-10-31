@@ -21,10 +21,10 @@ import gymnasium.spaces
 import numpy as np
 from PIL.ImageChops import offset
 
-from gym_pacman.envs.game import Directions, Actions
-import gym_pacman.envs.util
-from gym_pacman.envs.pacman import PacmanRules, SCARED_TIME, COLLISION_TOLERANCE
-from gym_pacman.envs.util import Counter,nearestPoint
+from gym_pacman_rules.envs.game import Directions, Actions
+import gym_pacman_rules.envs.util
+from gym_pacman_rules.envs.pacman import PacmanRules, SCARED_TIME, COLLISION_TOLERANCE
+from gym_pacman_rules.envs.util import Counter,nearestPoint
 
 
 def features_dict_to_array(features : Counter):

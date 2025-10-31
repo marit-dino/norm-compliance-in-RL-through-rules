@@ -4,7 +4,7 @@ import statistics
 import sys
 import time
 import highway_env
-import gym_pacman
+import gym_pacman_rules
 import torch
 from torch.distributions import Categorical
 
