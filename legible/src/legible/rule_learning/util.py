@@ -70,7 +70,7 @@ def predict_act(model, obs, action_tensor, sample_reconstruction,algo_name):
         obs_curr = obs_t[i, :].unsqueeze(0)
         if algo_name == "ppo":
             act_logits = policy.get_distribution(obs_curr).log_prob(action_tensor)
-        elif algo_name == "dqn":
+        elif "dqn" in algo_name:
             act_logits = policy.q_net(obs_curr).squeeze() # not really act_logits but treat them as a
 
         else:
@@ -91,7 +91,7 @@ def load_dqn_model(model_name, exact_match = False, env = None):
 def load_model(model_path,algo_name, exact_match = False,env= None):
     if algo_name == "ppo":
         return load_ppo_model(model_path,exact_match = exact_match)
-    elif algo_name == "dqn" or algo_name == "norm_guided_dqn":
+    elif "dqn" in algo_name:
         return load_dqn_model(model_path, exact_match=exact_match,env=env)
     else:
         raise Exception("Unsupported")

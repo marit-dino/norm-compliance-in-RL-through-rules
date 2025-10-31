@@ -82,7 +82,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
             for rule_action in neg_triggered:
                 act_logits[rule_action] = -1e6
                 return Categorical(logits=act_logits).sample()
-        elif algo_name == "dqn":
+        elif "dqn" in algo_name:
             # for some reason, the shape of q values keeps changing, so let's protect against erroneous results and fixed
             # the issue when it occurs again
             if list(act_logits.shape) != [1, action_tensor.shape[0]]:
@@ -111,7 +111,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
         if algo_name == "ppo":
             action, _states = model.predict(obs)
             estimated_value, act_logits, _ = policy.evaluate_actions(obs_t, action_tensor)  # .log_prob(action_tensor)
-        elif algo_name == "dqn":
+        elif "dqn" in algo_name:
             action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()
 

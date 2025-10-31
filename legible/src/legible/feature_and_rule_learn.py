@@ -183,7 +183,7 @@ def reselect_data(actions_tensor, algo_name, all_obs_data, eps_data_array, extra
         eps_data_array_reselected = eps_data_array
         obs_data_min_q_index = extract_actionwise_min_prob(eps_data_array_reselected, model, num_actions,
                                                            actions_tensor)
-    elif algo_name == "dqn" and extract_min_prob_neg_data:
+    elif "dqn" in algo_name and extract_min_prob_neg_data:
         obs_data_min_q_index = dqn_min_q_selection(eps_data_array_reselected, model, num_actions, actions_tensor,sample_reconstruction)
     return eps_data_array_reselected, obs_data_min_q_index
 

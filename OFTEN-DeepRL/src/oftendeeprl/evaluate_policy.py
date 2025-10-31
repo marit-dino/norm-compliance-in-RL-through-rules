@@ -65,7 +65,7 @@ def eval_single_eps(env, algo_name,model, action_tensor,norm_descriptor,gym_to_a
         elif "Gardener" in str(env):
             norm_helper.setup(env.get_wrapper_attr("instance"))
     while True:
-        if algo_name == "dqn" or algo_name.startswith("dqn-n"):
+        if "dqn" in algo_name or algo_name.startswith("dqn-n"):
             if norm_helper is not None:
                 if "Sumo" in str(env):
                     env_state = {'env': env}
