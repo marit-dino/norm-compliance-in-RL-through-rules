@@ -472,6 +472,8 @@ class ExtendedExtractor8(FeatureExtractor):
 
         x_int, y_int = int(x + 0.5), int(y + 0.5)
         for dir, vec in Actions._directionsAsList:
+            if dir == Directions.STOP:
+                continue
             dx, dy = vec
             next_y = y_int + dy
             next_x = x_int + dx
@@ -570,7 +572,7 @@ class ExtendedExtractor8(FeatureExtractor):
         # high[other_obs_size:] = 3 + 4 + 4
         return gymnasium.spaces.Box(low=low,high=high)
 
-def add_direction_ohe(features, direction, feature_name,with_out_stop=False):
+def add_direction_ohe(features, direction, feature_name,with_out_stop=True):
     for d in Actions._directions.keys():
         if with_out_stop and d == Directions.STOP:
             continue
@@ -679,9 +681,9 @@ class DeepRLCompleteExtractor(FeatureExtractor):
         food = state.getFood()
         walls = state.getWalls()
         ghosts = state.getGhostStates()
-        n_ghosts = len(ghosts) 
+        n_ghosts = len(ghosts)
         features = Counter()
-        max_dist = self.height + self.width 
+        max_dist = self.height + self.width
 
         # compute the location of pacman after he takes the action
         x, y = state.getPacmanPosition()
@@ -690,10 +692,10 @@ class DeepRLCompleteExtractor(FeatureExtractor):
                            return_dir=True)
         if dist_dir is not None:
             dist,food_dir = dist_dir
-            features[f"closest-food"] = dist / max_dist # c
-            add_direction_ohe(features, food_dir, f"closest-food-dir",with_out_stop=True) # c
+            features[f"closest-food"] = dist / max_dist
+            add_direction_ohe(features, food_dir, f"closest-food-dir",with_out_stop=True)
         else:
-            features[f"closest-food"] = 1 # c
+            features[f"closest-food"] = 1
             add_direction_ohe(features, Directions.STOP, f"closest-food-dir",with_out_stop=True)
         x_int, y_int = int(x + 0.5), int(y + 0.5)
         for dir, vec in Actions._directionsAsList:
@@ -704,21 +706,21 @@ class DeepRLCompleteExtractor(FeatureExtractor):
             next_x = x_int + dx
             if next_x < walls.width and next_y < walls.height:
                 if not walls[next_x][next_y]:
-                    features[f"poss-dir-{dir}"] = 1 #c
+                    features[f"poss-dir-{dir}"] = 1
                 else:
-                    features[f"poss-dir-{dir}"] = 0 #c
+                    features[f"poss-dir-{dir}"] = 0
 
         ghost_distances = defaultdict(list)
         for i,g in enumerate(ghosts):
             is_scared = 1 if g.isScared() else 0
-            features[f"ghost-{i}-scared"] = is_scared # c
-            features[f"ghost-{i}-scaredtime"] = g.scaredTimer / SCARED_TIME # c
+            features[f"ghost-{i}-scared"] = is_scared
+            features[f"ghost-{i}-scaredtime"] = g.scaredTimer / SCARED_TIME
             g_dist, g_dir = ghostDistance((x,y),g.getPosition(),walls,legal_neighbor_cache = self.legal_neighbor_cache,return_dir=True)
             ghost_distances["curr"].append((g_dist,g.isScared()))
-            features[f"ghost-{i}-dist"] = g_dist / max_dist # c
+            features[f"ghost-{i}-dist"] = g_dist / max_dist
 
             add_direction_ohe(features,g_dir if g_dir is not None else Directions.STOP,f"ghost-{i}-dir",with_out_stop=True)
-            add_direction_ohe(features,g.getDirection(),f"ghost-{i}-heading",with_out_stop=True) # c
+            add_direction_ohe(features,g.getDirection(),f"ghost-{i}-heading",with_out_stop=True)
             for action in Actions._directions.keys():
                 if action == Directions.STOP:
                     continue
@@ -729,8 +731,8 @@ class DeepRLCompleteExtractor(FeatureExtractor):
                                               legal_neighbor_cache=self.legal_neighbor_cache, return_dir=True)
                 ghost_distances[action].append((g_dist,g.isScared()))
 
-        features["#-of-non-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if not sc and d <= 1]) 
-        features["#-of-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if sc and d <= 1]) # c
+        features["#-of-non-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if not sc and d <= 1])
+        features["#-of-scared-ghosts-1-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if sc and d <= 1])
         features["#-of-non-scared-ghosts-le3-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if not sc and d <= 3])
         features["#-of-scared-ghosts-le3-step-away"] = len([(d,sc) for (d,sc) in ghost_distances["curr"] if sc and d <= 3])
 
@@ -767,15 +769,15 @@ class DeepRLCompleteExtractor(FeatureExtractor):
         features["#-of-non-scared-ghosts-le3-step-away"] /=n_ghosts
         features["#-of-scared-ghosts-le3-step-away"]/=n_ghosts
         cap_dist,cap_dir = closestCapsule((x, y),state.getCapsules(),walls,legal_neighbor_cache = self.legal_neighbor_cache)
-        features["closest-capsule-dist"] = cap_dist # c
+        features["closest-capsule-dist"] = cap_dist
 
-        add_direction_ohe(features, cap_dir, "closest-capsule-dir",with_out_stop=True) # c
- 
-        features["x"] = x / self.width # c
-        features["y"] = y / self.height # c
+        add_direction_ohe(features, cap_dir, "closest-capsule-dir",with_out_stop=True)
+
+        features["x"] = x / self.width
+        features["y"] = y / self.height
 
         return features
-    
+
     def get_obs_space(self,nr_ghosts):
         other_obs_size = 40
         obs_size = other_obs_size + nr_ghosts * 11

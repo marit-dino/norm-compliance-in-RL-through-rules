@@ -213,37 +213,37 @@ def get_features_and_failure_indication(env_name,mode, feature_extractor):
             nr_ghosts = 2
         else:
             raise Exception("Unknown env.")
-        nr_features_all = 21 + nr_ghosts * 24
+        nr_features_all = 18 + nr_ghosts * 22
         if feature_extractor == "extended-9":
             nr_features_all += 8
         categorical_features = list(range(nr_features_all))
         if nr_ghosts == 2 or nr_ghosts == 4:
-            categorical_features.remove(61)
-            categorical_features.remove(60)
-            categorical_features.remove(59)
-            categorical_features.remove(52)
-            categorical_features.remove(37)
-            categorical_features.remove(36)
-            categorical_features.remove(35)
-            categorical_features.remove(28)
-            categorical_features.remove(8)
-            categorical_features.remove(7)
-            categorical_features.remove(1)
-            categorical_features.remove(0)
+            categorical_features.remove(34) # ghost-1-dist
+            categorical_features.remove(12) # ghost-0-dist
+            categorical_features.remove(31) # ghost-1-scaredtime
+            categorical_features.remove(9) # ghost-0-scaredtime
+            categorical_features.remove(11) # ghost-0-y
+            categorical_features.remove(10) # ghost-0-x
+            categorical_features.remove(33) # ghost-1-y
+            categorical_features.remove(32) # ghost-1-x
+            categorical_features.remove(6) # #-of-ghosts-1-step-away
+            categorical_features.remove(7) # #-of-scared-ghosts-1-step-away
+            categorical_features.remove(1) # y
+            categorical_features.remove(0) # x
         if nr_ghosts == 2:
-            categorical_features.remove(68)
-            categorical_features.remove(67)
+            categorical_features.remove(57) # closest-food
+            categorical_features.remove(52) # closest-capsule-dis
         elif nr_ghosts == 4:
-            categorical_features.remove(76)
-            categorical_features.remove(83)
-            categorical_features.remove(84)
-            categorical_features.remove(85)
-            categorical_features.remove(100)
-            categorical_features.remove(107)
-            categorical_features.remove(108)
-            categorical_features.remove(109)
-            categorical_features.remove(115)
-            categorical_features.remove(116)
+            categorical_features.remove(56) # ghost-2-dist
+            categorical_features.remove(78) # ghost-3-dist
+            categorical_features.remove(75) # ghost-3-scaredtime
+            categorical_features.remove(53) # ghost-2-scaredtime
+            categorical_features.remove(55) # ghost-2-y
+            categorical_features.remove(54) # ghost-2-x
+            categorical_features.remove(77) # ghost-3-y
+            categorical_features.remove(76) # ghost-3-x
+            categorical_features.remove(101) # closest-food
+            categorical_features.remove(96) # closest-capsule-dis
 
         failure_indicator = lambda obs, r: r < -0.9
     return categorical_features, failure_indicator, nr_features_all, sample_reconstruction,groups_of_similar
