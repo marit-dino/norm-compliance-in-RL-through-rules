@@ -503,7 +503,7 @@ class ExtendedExtractor8(FeatureExtractor):
             # features[f"ghost-{i}-heading"] = g.getDirection()
             ghost_vector_x = g_x - x
             ghost_vector_y = g_y - y
-            if abs(ghost_vector_x) <= COLLISION_TOLERANCE + abs(ghost_vector_y) <= COLLISION_TOLERANCE:
+            if abs(ghost_vector_x) <= COLLISION_TOLERANCE and abs(ghost_vector_y) <= COLLISION_TOLERANCE:
                 ghost_approx_angle = 0
             else:
                 if ghost_vector_x > 0:
