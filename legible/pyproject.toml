@@ -1,8 +1,7 @@
 [tool.poetry]
 name = "legible"
 version = "1.0.0"
-description = "This project is from 'Rule-Guided Reinforcement Learning Policy Evaluation and Improvement.' (IJCAI, 2025), it
-aims to improve the performance of RL-agents using symbolic knowledge."
+description = "This project is from 'Rule-Guided Reinforcement Learning Policy Evaluation and Improvement.' (IJCAI, 2025), it aims to improve the performance of RL-agents using symbolic knowledge."
 authors = ["Martin Tappler, Ignacio D. Lopez-Miguel, Sebastian Tschiatschek, and Ezio Bartocci"]
 packages = [{ include = "legible", from = "src" },
             { include = "rule_learning", from = "src/legible" }

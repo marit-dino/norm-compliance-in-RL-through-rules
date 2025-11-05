@@ -1,8 +1,7 @@
 [tool.poetry]
 name = "main"
 version = "0.1.0"
-description = "This project aims to ensure that RL-agents trained on norms in fact do adhere to them using 
-ASP-planning and symbolic rules."
+description = "This project aims to ensure that RL-agents trained on norms in fact do adhere to them using ASP-planning and symbolic rules."
 readme = "../README.md"
 authors = ["Marit Einböck"]
 package-mode = false
