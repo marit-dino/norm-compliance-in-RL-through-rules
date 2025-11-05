@@ -1,20 +1,25 @@
 env:
   name: BerkeleyPacman-v0
   level: smallClassic
-  feature_extractor: complete #extended-8
-
+  
 training:
-  steps_initial: 1000 #_000
-  steps_norm: 1000 #_000
+  steps_initial: 1000_000
+  steps_norm: 1000_000
   algorithm: dqn
   ng_margin: 50
   norm_violation_filtering: True
-
-
-norms: 2-5-True
+  feature_extractor: complete
 
 rules:
-  episodes: 2500000
+  episodes: 25000 #00
   nr_features: 600
   lime_test_size: 100
   compute_correlation: False
+  feature_extractor: extended-8
+  model_number: 
+
+asp:
+  horizon: 2
+  radius: 5
+
+norm: vegetarian

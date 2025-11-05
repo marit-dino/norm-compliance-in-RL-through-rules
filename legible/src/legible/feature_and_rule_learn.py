@@ -61,10 +61,11 @@ def dqn_min_q_selection(obs_data, model, num_actions, action_tensor,sample_recon
 
 
 def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_features, lime_test_size, corr, algo_name,
-                                    feature_extractor, exact_model_number = None,
+                                    feature_extractor_deeprl, exact_model_number = None,
                                     extract_min_prob_neg_data = True,
                                     steps_norm = 0,
                                     norm_descriptor = "",
+                                    feature_extractor_rules = "",
                                     algorithm="ripper", min_acc=0.9, min_cov=0.01):
 
     # setup stuff
@@ -75,12 +76,12 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
 
     if "norm_guided" in algo_name:
         env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl(algo_name, env_name, mode, norm_descriptor, steps_initial, steps_norm,
-                                                                   feature_extractor=feature_extractor)
+                                                                   feature_extractor=feature_extractor_deeprl)
     else:
         env, model_name, model_path = create_environment_and_modelname(algo_name, env_name, mode, steps_initial,
-                                                                   feature_extractor=feature_extractor)
+                                                                   feature_extractor=feature_extractor_deeprl)
     categorical_features, failure_indicator, nr_features_all, sample_reconstruction,groups_of_similar = (
-        get_features_and_failure_indication(env_name, mode,feature_extractor))
+        get_features_and_failure_indication(env_name, mode,feature_extractor_rules))
     print(f"Loading {model_name}")
     if exact_model_number is None:
         model = load_model(model_path, algo_name)
@@ -160,7 +161,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                        feature_intervals, categorical_features)
 
     shield_name = f"pickles/shields/{'corr'if corr else 'uncorr'}/"\
-                  f"{algo_name}_{env_name.replace('/','_')}_{mode}_feat_{nr_features}_{steps}_shield"
+                  f"{algo_name}_{env_name.replace('/','_')}_{mode}_feat_{nr_features}_{steps_initial}_to_{steps_norm}_shield"
 
     if exact_model_number is None:
         save_pickle(shield_name,shield)

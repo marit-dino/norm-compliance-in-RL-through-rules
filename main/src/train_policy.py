@@ -11,7 +11,7 @@ def train_base_model(cfg : DictConfig) -> None:
     norm_descriptor, norm_helper = get_norm_helper(cfg.env.name, cfg.norms, cfg.env.level)
     # train on norms
     model_number = policy_name.removesuffix(".zip").rsplit("_", 1)[-1]
-    setup_and_ext_train(cfg.env.name, cfg.training.steps_initial, cfg.training.steps_norm, level, cfg.env.feature_extractor,
+    setup_and_ext_train(cfg.env.name, cfg.training.steps_initial, cfg.training.steps_norm, level, cfg.training.feature_extractor,
                         norm_helper, norm_descriptor = norm_descriptor, exact_model_number=model_number, 
                         ng_margin=cfg.training.ng_margin,norm_violation_filtering=cfg.training.norm_violation_filtering)
     
