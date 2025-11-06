@@ -11,12 +11,14 @@ training:
   feature_extractor: complete
 
 rules:
-  episodes: 25000 #00
-  nr_features: 600
+  episodes: 600
+  steps: 2500_000
+  nr_features: 62
   lime_test_size: 100
   compute_correlation: False
   feature_extractor: extended-8
   model_number: 
+  shield_number:
 
 asp:
   horizon: 2
