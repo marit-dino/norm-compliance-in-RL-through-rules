@@ -1,0 +1,8 @@
+stable_baselines3 == 2.5.0
+lime == 0.2.0.1
+gymnasium == 0.29.1
+minigrid == 3.0.0
+highway-env	== 1.10.1
+scikit-learn == 1.6.1
+clingo == 5.7.1
+tensorboard	== 2.19.0
