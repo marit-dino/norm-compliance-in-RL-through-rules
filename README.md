@@ -10,3 +10,6 @@ Open tasks:
 - [ ] evaluation
 - [ ] license(s)
 - [ ] attributions for legible, oftendeeprl
+- [ ] (re)check (categorical) features in rule mining
+- [ ] clean up episode data collection
+

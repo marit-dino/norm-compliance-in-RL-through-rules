@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch as tc
 from stable_baselines3.common.buffers import RolloutBuffer
+from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8 
 
 from rule_learning.util import save_pickle, load_pickle
 
@@ -17,6 +18,7 @@ class EpisodeData:
     est_values : list
     actions : list
     rewards : list
+    states: list
 
 
 def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
@@ -33,10 +35,12 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
     else:
         raise Exception("Unsupported")
 
-    data = EpisodeData([],[], [],[],[])
+    data = EpisodeData([],[], [],[],[],[])
     data.obs.append(obs)
     data.act_logits.append(act_logits)
     data.est_values.append(estimated_value)
+    feature_extractor = ExtendedExtractor8(height=env.unwrapped.layout.height, width=env.unwrapped.layout.width)
+    data.states.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=None))
     while True:
         action, _states = model.predict(obs)
         obs, reward, term, trunc, info = env.step(action)
@@ -56,6 +60,8 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
         data.act_logits.append(act_logits)
         data.actions.append(action)
         data.obs.append(obs)
+        #TODO extractor as parameter
+        data.states.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=action))
         if term and reward <= 0:
             data.rewards.append(min(-1,reward))
         else:
@@ -153,7 +159,7 @@ def is_in_failure_neighborhood(pos, single_eps_data, neighborhood_size, failure_
                 for (obs_s,reward_s) in neighborhood])
 
 
-def get_obs_data_from_eps(eps_data, nr_data_points, failure_neighborhood = -1,
+def get_obs_data_from_eps(env, eps_data, nr_data_points, failure_neighborhood = -1,
                           failure_indicator = None,
                           act_probs_for_label=False,
                           return_all=False):
@@ -163,14 +169,17 @@ def get_obs_data_from_eps(eps_data, nr_data_points, failure_neighborhood = -1,
     if failure_neighborhood > 0:
         eps_data = filter_eps_for_failing(eps_data,failure_indicator)
         print(f"{len(eps_data)}")
+    feature_extractor = ExtendedExtractor8(height=env.unwrapped.layout.height, width=env.unwrapped.layout.width)
     for e in eps_data:
         for i in range(len(e.obs)):
             if (failure_neighborhood <= 0) or (failure_neighborhood > 0 and is_in_failure_neighborhood(i,e,
                                                                             failure_neighborhood,failure_indicator)):
                 act_logits = e.act_logits[i]
                 act_logit_data.append(act_logits.cpu().numpy())
-                obs = e.obs[i]
-                obs_flat = obs.flatten()
+                #obs = e.obs[i]
+                #obs_flat = obs.flatten()
+                features = e.states[i]
+                obs_flat = np.array([features[k] for k in features.keys()])
                 value = e.est_values[i] if isinstance(e.est_values[i],float) else e.est_values[i].item()
                 if act_probs_for_label:
                     label = tc.softmax(act_logits,0)

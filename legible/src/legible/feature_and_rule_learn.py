@@ -99,9 +99,9 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                                           try_load=exact_model_number is None)
     nr_experiences = int(sum(len(d.obs) for d in eps_data) / nr_exp_factor)
     print(f"Going to select {nr_experiences} experiences")
-    all_obs_data, eps_data_array,_ = get_obs_data_from_eps(eps_data, nr_experiences,
+    all_obs_data, eps_data_array,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                          return_all=True)
-    all_obs_data_failure, eps_data_array_failure,_ = get_obs_data_from_eps(eps_data, nr_experiences,
+    all_obs_data_failure, eps_data_array_failure,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                                            failure_neighborhood=failure_neighborhood,
                                                                            failure_indicator=failure_indicator,
                                                          return_all=True)
