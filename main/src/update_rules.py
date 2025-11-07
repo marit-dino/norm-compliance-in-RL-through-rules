@@ -24,7 +24,7 @@ def update_rules(cfg : DictConfig) -> None:
     shield_number = get_shield_number(cfg)
 
     #TODO what is difference between uncorr and improved?
-    shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, True, False, exact_model_number=shield_number,
                            steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
 
     if shield is None:
