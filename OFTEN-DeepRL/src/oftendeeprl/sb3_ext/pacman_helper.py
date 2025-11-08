@@ -12,7 +12,7 @@ class PacmanClingoHelper(ClingoHelper):
             ["-c", f"horizon={horizon}",
              "-c", f"radius={radius}",
              "-c", f"ghosts={ghosts}"])
-        self.ctl.load('../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
+        self.ctl.load('../../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
         self.ctl.ground([("base", [])], context=self)
 
         self.radius = radius
