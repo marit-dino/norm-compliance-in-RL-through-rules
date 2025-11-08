@@ -1,7 +1,8 @@
 import hydra
 from omegaconf import DictConfig
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
-from legible.evaluate_policy import setup_shield
+from legible.evaluate_policy import setup_shield, eval_single_eps
+from legible.shield.shields import RuleChooser 
 import torch
 import sys
 from os import listdir
@@ -29,6 +30,13 @@ def update_rules(cfg : DictConfig) -> None:
 
     if shield is None:
         sys.exit("Could not load shield, check if it exists.")
+    rule_chooser = RuleChooser(shield)
+    #Todo set up rule chooser
+
+    # TODO until convergence
+    for i in range(100):
+        eval_single_eps(env, "norm_guided_dqn", action_tensor, shield, rule_chooser)
+
 
 
     

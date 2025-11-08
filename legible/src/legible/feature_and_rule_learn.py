@@ -95,7 +95,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     actions_tensor = torch.tensor(range(num_actions), device=device)
 
     # data collection
-    eps_data = collect_eps_data_for_rules(nr_eps, env, model,algo_name, actions_tensor,model_name,
+    eps_data = collect_eps_data_for_rules(nr_eps, env, model,algo_name, actions_tensor,model_name,feature_extractor_rules,
                                           try_load=exact_model_number is None)
     nr_experiences = int(sum(len(d.obs) for d in eps_data) / nr_exp_factor)
     print(f"Going to select {nr_experiences} experiences")
