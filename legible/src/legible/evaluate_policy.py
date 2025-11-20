@@ -3,6 +3,7 @@ import math
 import statistics
 import sys
 import time
+import numpy as np
 #import highway_env
 import gym_pacman_rules
 import torch
@@ -11,6 +12,8 @@ from torch.distributions import Categorical
 from rule_learning.util import load_pickle, load_model, save_pickle
 from env_util import create_environment_and_modelname
 from shield.shields import AspShield, RuleChooser, RandomShield
+from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
+
 
 
 def find_top_k_indices(base_model_name, top_string, return_rew = False):
@@ -97,7 +100,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = None,rule_chooser = None,change_type=None):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shield : AspShield = None,rule_chooser = None,change_type=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -107,6 +110,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
     use_rule = shield is not None
     action_changes = 0
     last_action = None
+    feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     while True:
         if algo_name == "ppo":
             action, _states = model.predict(obs)
@@ -119,7 +123,9 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
         else:
             raise Exception("Unsupported")
         if use_rule:
-            obs_flat = obs.flatten()
+            raw_state = env.unwrapped.game.state
+            obs_features = feature_extractor.getFeatures(raw_state,action)
+            obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
             triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
             if triggers:
                 (pos_triggered, neg_triggered) = triggered
@@ -142,6 +148,17 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
 
     return win, rewards, action_changes
 
+def get_feature_extractor(feature_extractor, height, width):
+    if feature_extractor == "extended-6":
+        return ExtendedExtractor6(height=height,width=width)
+    elif feature_extractor == "extended-7":
+        return ExtendedExtractor7(height=height,width=width)
+    elif feature_extractor == "extended-8":
+        return ExtendedExtractor8(height=height,width=width)
+    elif feature_extractor == "extended-9":
+        return ExtendedExtractor9(height=height,width=width)
+    elif feature_extractor == "complete" :
+        return DeepRLCompleteExtractor(height=height, width=width)
 
 def evaluate(env,algo_name, model,nr_eps,action_tensor,rule_string = '',shield = None,rule_chooser = None, change_type = None):
     if rule_chooser is not None:
@@ -152,7 +169,7 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,rule_string = '',shield =
     all_rews = []
     wins = []
     for i in range(nr_eps):
-        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,shield,rule_chooser,change_type)
+        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,'extended-8', shield,rule_chooser,change_type)
         wins.append(win)
         all_rews.append(rewards)
         action_changes_list.append(action_changes)
