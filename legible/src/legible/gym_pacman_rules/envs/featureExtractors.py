@@ -564,9 +564,9 @@ class ExtendedExtractor8(FeatureExtractor):
         return features
 
     def get_obs_space(self,nr_ghosts):
-        other_obs_size = 21
+        other_obs_size = 18
         # map_size = self.width * self.height
-        obs_size = other_obs_size + nr_ghosts * 24
+        obs_size = other_obs_size + nr_ghosts * 22
         low = np.zeros(obs_size)
         high = np.ones(obs_size) * max(self.width,self.height)
         # high[other_obs_size:] = 3 + 4 + 4

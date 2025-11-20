@@ -3,10 +3,10 @@ import sys
 import gymnasium.spaces
 import numpy as np
 import torch
-from .rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
-from .rule_learning.feature_detection import detect_features, get_most_important_corr_features
-from .rule_learning.learnRules import extract_features_from_obs, get_rules
-from .rule_learning.util import save_pickle, load_model
+from rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
+from rule_learning.feature_detection import detect_features, get_most_important_corr_features
+from rule_learning.learnRules import extract_features_from_obs, get_rules
+from rule_learning.util import save_pickle, load_model
 from legible.env_util import create_environment_and_modelname, create_environment_and_modelname_for_oftendeeprl
 
 from shield.shields import AspShield
@@ -73,6 +73,9 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     # constant settings
     nr_exp_factor = 5
     failure_neighborhood = -1
+
+    if feature_extractor_rules == "":
+        feature_extractor_rules = feature_extractor
 
     if "norm_guided" in algo_name:
         env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl(algo_name, env_name, mode, norm_descriptor, steps_initial, steps_norm,
