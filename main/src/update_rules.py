@@ -1,16 +1,17 @@
 import hydra
 from omegaconf import DictConfig
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
-from legible.evaluate_policy import setup_shield, eval_single_eps, EvalStats
+from legible.evaluate_policy import setup_shield, eval_single_eps, EvalStats, change_action
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
 from legible.shield.create_rules_common import turn_rules_to_str
 from legible.rule_learning.util import load_model
+from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
 import torch
 import sys
 from os import listdir
 from os.path import isfile, join
-import os
+import numpy as np
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def update_rules(cfg : DictConfig) -> None:
@@ -39,25 +40,61 @@ def update_rules(cfg : DictConfig) -> None:
     assert hasattr(shield, 'enforceable_rules')
     assert hasattr(shield, 'cancelable_rules')
 
-    #Todo set up rule chooser
+    # TODO fix names
+    update(env, model, action_tensor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.feature_extractor)
 
-    # TODO until convergence
 
-    all_rews = []
-    wins = []
-    action_changes_list = []
 
-    for i in range(50):
-        win, rewards,action_changes = eval_single_eps(env, "norm_guided_dqn", model, action_tensor, shield, rule_chooser, change_type="favor_cancel")
-        wins.append(win)
-        all_rews.append(rewards)
-        action_changes_list.append(action_changes)
 
-    eval_stats = EvalStats(all_rews,action_changes_list,wins)
-    print(f"Nr. wins: {eval_stats.nr_wins}")
-    print(f"Avg. reward: {eval_stats.avg_rew} with SE {eval_stats.stderr_rew}")
-    print(f"Avg. steps: {eval_stats.avg_steps} with SE {eval_stats.stderr_steps}")
-    print(f"Avg. action changes: {eval_stats.avg_action_changes} with SE {eval_stats.stderr_action_changes}")
+# adapted from legible
+def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_extractor):
+    obs, info = env.reset()
+    policy = model.policy
+    obs_t, vectorized_env = policy.obs_to_tensor(obs)
+    obs_t = obs_t.to(action_tensor.device)
+    last_action = None
+    feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+
+    # TODO until convergence etc.
+    for i in range(500):
+        #print(i)
+        action, _states = model.predict(obs)
+        q_values = policy.q_net(obs_t).squeeze()
+        act_logits = q_values        
+        raw_state = env.unwrapped.game.state
+        obs_features = feature_extractor.getFeatures(raw_state,action)
+        obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
+        triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
+
+        if triggers:
+            (pos_triggered, neg_triggered) = triggered
+            changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+                                            last_action,change_type="favor_cancel")
+            if changed_action is not None:
+                action = changed_action
+
+        obs, reward, term, trunc, info = env.step(action)
+
+        obs_t, vectorized_env = policy.obs_to_tensor(obs)
+        obs_t = obs_t.to(action_tensor.device)
+        last_action = action
+
+        violated_norm(raw_state, env.unwrapped.game.state)
+
+        if term and reward > 0:
+            win = True 
+        if term or trunc:
+            obs, info = env.reset()
+            obs_t, vectorized_env = policy.obs_to_tensor(obs)
+            obs_t = obs_t.to(action_tensor.device)
+            last_action = None
+
+
+def violated_norm(prev, curr):
+    # TODO find where number of times eaten is stored
+    return False
+
+
 
 
 # adapted from legible
@@ -100,6 +137,19 @@ def get_shield_number(cfg):
         return sorted(shields)[-1].removesuffix(".pkl").rsplit("_", 1)[-1]
     else: 
        return cfg.rules.shield_number
+    
+
+def get_feature_extractor(feature_extractor, height, width):
+    if feature_extractor == "extended-6":
+        return ExtendedExtractor6(height=height,width=width)
+    elif feature_extractor == "extended-7":
+        return ExtendedExtractor7(height=height,width=width)
+    elif feature_extractor == "extended-8":
+        return ExtendedExtractor8(height=height,width=width)
+    elif feature_extractor == "extended-9":
+        return ExtendedExtractor9(height=height,width=width)
+    elif feature_extractor == "complete" :
+        return DeepRLCompleteExtractor(height=height, width=width)
 
 if __name__ == "__main__":
     update_rules()
