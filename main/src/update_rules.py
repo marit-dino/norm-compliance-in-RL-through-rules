@@ -1,21 +1,26 @@
 import hydra
 from omegaconf import DictConfig
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
-from legible.evaluate_policy import setup_shield, eval_single_eps, EvalStats, change_action
+from legible.evaluate_policy import setup_shield, change_action
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
 from legible.shield.create_rules_common import turn_rules_to_str
 from legible.rule_learning.util import load_model
 from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
+from oftendeeprl.env_util import PacmanClingoHelper
 import torch
 import sys
+import check_norms
 from os import listdir
 from os.path import isfile, join
 import numpy as np
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def update_rules(cfg : DictConfig) -> None:
-    norm_descriptor = cfg.norm + "_" + str(cfg.asp.horizon) + "_" + str(cfg.asp.radius)
+    norm_descriptor = ""
+    for norm in cfg.norms:
+        norm_descriptor += norm + "_"
+    norm_descriptor += str(cfg.asp.horizon) + "_" + str(cfg.asp.radius)
 
     env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
                                                                                     cfg.env.level, norm_descriptor, 
@@ -41,23 +46,23 @@ def update_rules(cfg : DictConfig) -> None:
     assert hasattr(shield, 'cancelable_rules')
 
     # TODO fix names
-    update(env, model, action_tensor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.feature_extractor)
+    update(env, model, action_tensor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.feature_extractor, cfg.norms)
 
 
 
 
 # adapted from legible
-def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_extractor):
+def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_extractor, norms, horizon, radius, ghosts):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
     obs_t = obs_t.to(action_tensor.device)
     last_action = None
     feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    asp_helper = PacmanClingoHelper(horizon, radius, ghosts, vegetarian=True)
 
     # TODO until convergence etc.
-    for i in range(500):
-        #print(i)
+    for i in range(5000):
         action, _states = model.predict(obs)
         q_values = policy.q_net(obs_t).squeeze()
         act_logits = q_values        
@@ -79,7 +84,8 @@ def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_e
         obs_t = obs_t.to(action_tensor.device)
         last_action = action
 
-        violated_norm(raw_state, env.unwrapped.game.state)
+        if check_norms.violations_detected(norms, env.unwrapped.game.state):
+            asp_helper.get_action(env.unwrapped.state, action_value_pairs_dict)
 
         if term and reward > 0:
             win = True 
@@ -89,10 +95,6 @@ def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_e
             obs_t = obs_t.to(action_tensor.device)
             last_action = None
 
-
-def violated_norm(prev, curr):
-    # TODO find where number of times eaten is stored
-    return False
 
 
 
@@ -150,6 +152,11 @@ def get_feature_extractor(feature_extractor, height, width):
         return ExtendedExtractor9(height=height,width=width)
     elif feature_extractor == "complete" :
         return DeepRLCompleteExtractor(height=height, width=width)
+    
+
+def less_violations_possible():
+    return True
+    # TODO
 
 if __name__ == "__main__":
     update_rules()

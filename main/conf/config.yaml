@@ -24,4 +24,4 @@ asp:
   horizon: 2
   radius: 5
 
-norm: vegetarian
+norms: [vegetarian]
