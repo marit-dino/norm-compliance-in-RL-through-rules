@@ -1,14 +1,17 @@
+import logging
+
+log = logging.getLogger(__name__)
+
+
 def violated_vegetarian(state):
     if state.data._eaten[2]:
-        print(state.data._eaten)
-        print("ghost 2 eaten")
+        log.info("norm 'vegetarian' violated")
         return True
     return False
 
 def violated_vegan(state):
     if state.data._eaten[1] or state.data._eaten[2]:
-        print(state.data._eaten)
-        print("ghost eaten")
+        log.info("norm 'vegan' violated")
         return True
     return False
 

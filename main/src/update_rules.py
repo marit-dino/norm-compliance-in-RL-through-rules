@@ -7,13 +7,16 @@ from legible.create_rules_pacman import string_to_rule
 from legible.shield.create_rules_common import turn_rules_to_str
 from legible.rule_learning.util import load_model
 from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
-from oftendeeprl.env_util import PacmanClingoHelper
-import torch
-import sys
+from oftendeeprl.env_util import PacmanClingoHelper, get_gym_to_action_names
+from pacman_helper_asp import PacmanClingoHelperAsp
+import sys, logging, torch
 import check_norms
 from os import listdir
 from os.path import isfile, join
 import numpy as np
+from collections import deque 
+
+log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def update_rules(cfg : DictConfig) -> None:
@@ -46,20 +49,23 @@ def update_rules(cfg : DictConfig) -> None:
     assert hasattr(shield, 'cancelable_rules')
 
     # TODO fix names
-    update(env, model, action_tensor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.feature_extractor, cfg.norms)
+    update(env, model, action_tensor, shield, rule_chooser, cfg)
 
 
 
 
 # adapted from legible
-def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_extractor, norms, horizon, radius, ghosts):
+def update(env, model, action_tensor, shield, rule_chooser, cfg):
+    # TODO think about horizon
+    last_n_states = deque(maxlen=cfg.asp.horizon+1)
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
     obs_t = obs_t.to(action_tensor.device)
     last_action = None
-    feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    asp_helper = PacmanClingoHelper(horizon, radius, ghosts, vegetarian=True)
+    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    # TODO determine number of ghosts + vegetarian
+    last_n_states.append(env.unwrapped.game.state)
 
     # TODO until convergence etc.
     for i in range(5000):
@@ -69,23 +75,23 @@ def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_e
         raw_state = env.unwrapped.game.state
         obs_features = feature_extractor.getFeatures(raw_state,action)
         obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
-        triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
-
-        if triggers:
-            (pos_triggered, neg_triggered) = triggered
-            changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
-                                            last_action,change_type="favor_cancel")
-            if changed_action is not None:
-                action = changed_action
+        
+        action = get_action(model, obs, shield, obs_flat, rule_chooser, cfg.training.algorithm, act_logits, action_tensor, last_action)
 
         obs, reward, term, trunc, info = env.step(action)
+        last_n_states.append(env.unwrapped.game.state)
 
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
         last_action = action
 
-        if check_norms.violations_detected(norms, env.unwrapped.game.state):
-            asp_helper.get_action(env.unwrapped.state, action_value_pairs_dict)
+        if check_norms.violations_detected(cfg.norms, env.unwrapped.game.state):
+            for state in last_n_states:
+                # TODO fix step?
+                log.info(f"step {i}: \n{state}")
+            asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, 2, vegetarian=True, num_violations=1)
+            print(asp_helper.less_violations_possible(last_n_states.popleft()))
+            
 
         if term and reward > 0:
             win = True 
@@ -96,7 +102,55 @@ def update(env, model, action_tensor, shield, rule_chooser, algo_name, feature_e
             last_action = None
 
 
+# adapted from oftendeeprl
+def get_action_values(asp_helper, env_state, obs, policy):
+    relevant_states = asp_helper.get_relevant_states(env_state, obs)
+    action_value_pairs_dict = dict()
+    orig_action = None
+    gym_to_action_names = get_gym_to_action_names("Pacman")
+    for (rel_s, rel_s_id) in relevant_states:
+        if rel_s is not None:
+            obs_t, _vectorized = policy.obs_to_tensor(rel_s)
+            q_values = policy.q_net(obs_t).squeeze()
+            action_value_pairs = []
 
+            orig_action = -1
+            max_q = -1e10
+            for a in range(4):
+                act_name = gym_to_action_names[a]
+                q = q_values[a].item()
+                action_value_pairs.append((act_name, q))
+                if q > max_q:
+                    max_q = q
+                    orig_action = a
+            # TODO can i really remove this
+            # if chosen_actions is not None:
+            #     for action_int, (a, v) in enumerate(action_value_pairs):
+            #         if action_int == chosen_actions[i]:
+            #             action_value_pairs[action_int] = (a, max_q + margin)
+            #             break
+            #     orig_action = chosen_actions[i]
+        else:
+            action_value_pairs = []
+            for a in range(4):
+                act_name = gym_to_action_names[a]
+                action_value_pairs.append((act_name, -1))
+
+        action_value_pairs_dict[rel_s_id] = action_value_pairs
+    return action_value_pairs_dict
+
+
+def get_action(model, obs, shield, obs_flat, rule_chooser, algo_name, act_logits, action_tensor, last_action):
+    action, _states = model.predict(obs)
+    triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
+
+    if triggers:
+        (pos_triggered, neg_triggered) = triggered
+        changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+                                        last_action,change_type="favor_cancel")
+        if changed_action is not None:
+            action = changed_action
+    return action
 
 
 # adapted from legible
