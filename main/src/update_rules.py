@@ -57,7 +57,7 @@ def update_rules(cfg : DictConfig) -> None:
 # adapted from legible
 def update(env, model, action_tensor, shield, rule_chooser, cfg):
     # TODO think about horizon
-    last_n_states = deque(maxlen=cfg.asp.horizon+1)
+    last_n_states = deque(maxlen=cfg.asp.horizon)
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -68,7 +68,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_states.append(env.unwrapped.game.state)
 
     # TODO until convergence etc.
-    for i in range(5000):
+    for i in range(50000):
         action, _states = model.predict(obs)
         q_values = policy.q_net(obs_t).squeeze()
         act_logits = q_values        
@@ -86,9 +86,8 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
         last_action = action
 
         if check_norms.violations_detected(cfg.norms, env.unwrapped.game.state):
-            for state in last_n_states:
-                # TODO fix step?
-                log.info(f"step {i}: \n{state}")
+            for j, state in enumerate(last_n_states):
+                log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
             asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, 2, vegetarian=True, num_violations=1)
             print(asp_helper.less_violations_possible(last_n_states.popleft()))
             
@@ -101,43 +100,6 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
             obs_t = obs_t.to(action_tensor.device)
             last_action = None
 
-
-# adapted from oftendeeprl
-def get_action_values(asp_helper, env_state, obs, policy):
-    relevant_states = asp_helper.get_relevant_states(env_state, obs)
-    action_value_pairs_dict = dict()
-    orig_action = None
-    gym_to_action_names = get_gym_to_action_names("Pacman")
-    for (rel_s, rel_s_id) in relevant_states:
-        if rel_s is not None:
-            obs_t, _vectorized = policy.obs_to_tensor(rel_s)
-            q_values = policy.q_net(obs_t).squeeze()
-            action_value_pairs = []
-
-            orig_action = -1
-            max_q = -1e10
-            for a in range(4):
-                act_name = gym_to_action_names[a]
-                q = q_values[a].item()
-                action_value_pairs.append((act_name, q))
-                if q > max_q:
-                    max_q = q
-                    orig_action = a
-            # TODO can i really remove this
-            # if chosen_actions is not None:
-            #     for action_int, (a, v) in enumerate(action_value_pairs):
-            #         if action_int == chosen_actions[i]:
-            #             action_value_pairs[action_int] = (a, max_q + margin)
-            #             break
-            #     orig_action = chosen_actions[i]
-        else:
-            action_value_pairs = []
-            for a in range(4):
-                act_name = gym_to_action_names[a]
-                action_value_pairs.append((act_name, -1))
-
-        action_value_pairs_dict[rel_s_id] = action_value_pairs
-    return action_value_pairs_dict
 
 
 def get_action(model, obs, shield, obs_flat, rule_chooser, algo_name, act_logits, action_tensor, last_action):
@@ -188,7 +150,6 @@ def get_shield_number(cfg):
         shield_name = f"norm_guided_dqn_{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
         shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name)]
         if len(shields) == 0:
-            print(shield_name)
             sys.exit("No shield found that matches the provided parameters.")
         return sorted(shields)[-1].removesuffix(".pkl").rsplit("_", 1)[-1]
     else: 

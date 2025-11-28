@@ -102,7 +102,6 @@ class PacmanClingoHelperAsp(PacmanClingoHelper):
         self.set_clingo_externals(state)
 
         # solve the LP
-        print(self.ctl.solve(on_model=self.on_model))
-
+        result = self.ctl.solve(on_model=self.on_model)
     
-        return None
+        return result
