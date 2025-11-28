@@ -449,7 +449,7 @@ class GameStateData:
                 food, walls = self.food, self.layout.walls
                 map[x][y] = self._foodWallStr(food[x][y], walls[x][y])
 
-        for agentState in self.agentStates:
+        for i,agentState in enumerate(self.agentStates):
             if agentState == None: continue
             if agentState.configuration == None: continue
             x,y = [int( i ) for i in nearestPoint( agentState.configuration.pos )]
@@ -457,7 +457,7 @@ class GameStateData:
             if agentState.isPacman:
                 map[x][y] = self._pacStr( agent_dir )
             else:
-                map[x][y] = self._ghostStr( agent_dir )
+                map[x][y] = self._ghostStr( agent_dir, i)
 
         for x, y in self.capsules:
             map[x][y] = 'o'
@@ -481,8 +481,8 @@ class GameStateData:
             return '>'
         return '<'
 
-    def _ghostStr( self, dir ):
-        return 'G'
+    def _ghostStr( self, dir, i ):
+        return str(i)
         if dir == Directions.NORTH:
             return 'M'
         if dir == Directions.SOUTH:
