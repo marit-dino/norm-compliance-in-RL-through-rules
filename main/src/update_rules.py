@@ -19,7 +19,7 @@ from collections import deque
 log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
-def update_rules(cfg : DictConfig) -> None:
+def setup_update(cfg : DictConfig) -> None:
     norm_descriptor = ""
     for norm in cfg.norms:
         norm_descriptor += norm + "_"
@@ -56,7 +56,6 @@ def update_rules(cfg : DictConfig) -> None:
 
 # adapted from legible
 def update(env, model, action_tensor, shield, rule_chooser, cfg):
-    # TODO think about horizon
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
     obs, info = env.reset()
     policy = model.policy
@@ -64,9 +63,9 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
     obs_t = obs_t.to(action_tensor.device)
     last_action = None
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    # TODO determine number of ghosts + vegetarian
+    # TODO determine vegetarian/norms
     last_n_states.append(env.unwrapped.game.state)
-    asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, 2, vegetarian=True, num_norms=len(cfg.norms))
+    asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), vegetarian=True, num_norms=len(cfg.norms))
 
 
     # TODO until convergence etc.
@@ -93,9 +92,15 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
             for j, state in enumerate(last_n_states):
                 log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
                 if j < cfg.asp.horizon:
-                    print(cfg.asp.horizon-j+1)
                     less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), 1, cfg.asp.horizon-j+1))
             print(less_violations_possible)
+            try:
+                change_index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
+                update_ruleset(last_n_states[change_index], rule_chooser, last_action)
+            except:
+                log.info("Nothing to update, the number of violations cannot be decreased reliably.")
+
+
 
         if term and reward > 0:
             win = True 
@@ -105,6 +110,11 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
             obs_t = obs_t.to(action_tensor.device)
             last_action = None
 
+
+
+def update_ruleset(state, rule_chooser, action):
+    # TODO
+    return
 
 
 def get_action(model, obs, shield, obs_flat, rule_chooser, algo_name, act_logits, action_tensor, last_action):
@@ -138,6 +148,12 @@ def set_rules(shield):
     rule_chooser.set_rules_list(list(range(0, len(list(enforceable_rules.keys()) + list(cancelable_rules.keys())))))
     return shield, rule_chooser
     
+
+def number_of_ghosts(level):
+    if level.startswith("small"):
+        return 2
+    else:
+        return 4
 
 def get_model_number(cfg, norm_descriptor):
     if cfg.rules.model_number is None:
@@ -174,9 +190,5 @@ def get_feature_extractor(feature_extractor, height, width):
         return DeepRLCompleteExtractor(height=height, width=width)
     
 
-def less_violations_possible():
-    return True
-    # TODO
-
 if __name__ == "__main__":
-    update_rules()
+    setup_update()
