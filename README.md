@@ -7,7 +7,9 @@ Open tasks:
 - [x] mine rules
 - [ ] update process
     - [ ] update method for rules to exlude specific states
-    - [ ] check whether less violations are possible in asp
+    - [x] check whether less violations are possible in asp
+- [ ] documentation/comments
+- [ ] add more complex norms
 - [ ] evaluation
 - [ ] license(s)
 - [ ] attributions for legible, oftendeeprl
