@@ -9,11 +9,11 @@ from oftendeeprl.sb3_ext.pacman_helper import PacmanClingoHelper
 #TODO rename
 class PacmanClingoHelperAsp(PacmanClingoHelper):
 
-    def __init__(self, horizon, radius, ghosts, vegetarian, num_violations):
+    def __init__(self, horizon, radius, ghosts, vegetarian, num_norms):
         self.ctl = clingo.Control(
-            ["-c", f"horizon={horizon}",
+            ["-c", f"max_horizon={horizon+1}",
              "-c", f"radius={radius}",
-             "-c", f"num_violations={num_violations}",
+             "-c", f"num_norms={num_norms}",
              "-c", f"ghosts={ghosts}"])
         self.ctl.load('pacman_program_asp.lp')
         self.ctl.ground([("base", [])], context=self)
@@ -24,7 +24,7 @@ class PacmanClingoHelperAsp(PacmanClingoHelper):
         self.vegetarian = vegetarian
 
 
-    def set_clingo_externals(self, state):
+    def set_clingo_externals(self, state, num_violations, dynamic_horizon):
             midpoint = state.getPacmanPosition()
 
             # walls
@@ -86,11 +86,15 @@ class PacmanClingoHelperAsp(PacmanClingoHelper):
                         Function("grow",
                                 [Number(c), Number(int(relative[1])), Number(0)]),
                         True)
+                    
+            # number of violations
+            self.ctl.assign_external(Function("num_violations", [Number(num_violations)]), True)
+            # dynamic horizon
+            self.ctl.assign_external(Function("horizon", [Number(dynamic_horizon)]), True)
 
             
 
-    def less_violations_possible(self, state):
-        self.next = None
+    def less_violations_possible(self, state, num_violations, dynamic_horizon):
 
         # Reset the clingo window
         self.reset_clingo_externals(state)
@@ -99,9 +103,9 @@ class PacmanClingoHelperAsp(PacmanClingoHelper):
         # "Optimization-> Windowing" in the main document for more information)
         # Externals include cell information (walls, ghosts) as well as
         # information about policy preferences
-        self.set_clingo_externals(state)
+        self.set_clingo_externals(state, num_violations, dynamic_horizon)
 
         # solve the LP
         result = self.ctl.solve(on_model=self.on_model)
     
-        return result
+        return result.satisfiable

@@ -57,7 +57,7 @@ def update_rules(cfg : DictConfig) -> None:
 # adapted from legible
 def update(env, model, action_tensor, shield, rule_chooser, cfg):
     # TODO think about horizon
-    last_n_states = deque(maxlen=cfg.asp.horizon)
+    last_n_states = deque(maxlen=cfg.asp.horizon+1)
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -66,6 +66,8 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     # TODO determine number of ghosts + vegetarian
     last_n_states.append(env.unwrapped.game.state)
+    asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, 2, vegetarian=True, num_norms=len(cfg.norms))
+
 
     # TODO until convergence etc.
     for i in range(50000):
@@ -86,11 +88,14 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
         last_action = action
 
         if check_norms.violations_detected(cfg.norms, env.unwrapped.game.state):
+            less_violations_possible = []
+            last_n_states_copy = last_n_states.copy()
             for j, state in enumerate(last_n_states):
                 log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
-            asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, 2, vegetarian=True, num_violations=1)
-            print(asp_helper.less_violations_possible(last_n_states.popleft()))
-            
+                if j < cfg.asp.horizon:
+                    print(cfg.asp.horizon-j+1)
+                    less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), 1, cfg.asp.horizon-j+1))
+            print(less_violations_possible)
 
         if term and reward > 0:
             win = True 
