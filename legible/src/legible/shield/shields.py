@@ -133,16 +133,28 @@ class AspShield(Shield):
         if len(res) == 0:
             return []
         else:
-            triggered_actions = [int(str(item.arguments[0])) for item in res[0] if (item.name == "action")]
-            triggered_actions = list(set(triggered_actions))
+            triggered_actions_rules = [item.arguments for item in res[0] if (item.name == "triggered_by")]
+            triggered_actions = list(set([int(str(item[1])) for item in triggered_actions_rules]))
+            triggered_actions_rules = [self.transform_triggered_rule(rule_action, rules) for rule_action in triggered_actions_rules]
             return triggered_actions
 
+    def transform_rule(self, rule, i):
+        action = rule.rpartition("action(")[2].split(")")[0]
+        ret1 = f"{rule.strip('.')}, triggered_by({i}, {action})."
+        ret2 = f"triggered_by({i}, {action}){rule.strip(f'-action({action})')}"
+        return ret1, ret2
+    
+    def transform_triggered_rule(self, rule_action, rules):
+        # TODO get original rule back
+        return 
+
+
     def does_rule_trigger(self,obs, rule_chooser : RuleChooser):
-        features = self.raw_features(obs)
+        features = self.raw_features(obs)   
         facts = self.raw_features_into_facts(features)
 
         rules = rule_chooser.choose_rules()
-        pos_rules = [r for r in rules if r.startswith("action")]
+        pos_rules = [rt for i, r in enumerate(rules) if r.startswith("action") for rt in self.transform_rule(r, i) ]
         neg_rules = [r for r in rules if r.startswith("-action")]
         pos_triggered = self.get_trigger_action(pos_rules, facts)
         neg_triggered = self.get_trigger_action(neg_rules, facts)
