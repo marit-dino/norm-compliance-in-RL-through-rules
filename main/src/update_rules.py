@@ -6,6 +6,7 @@ from legible.shield.shields import RuleChooser
 from legible.create_rules_pacman import string_to_rule
 from legible.shield.create_rules_common import turn_rules_to_str
 from legible.rule_learning.util import load_model
+from legible.feature_and_rule_learn import get_features_and_failure_indication
 from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
 from oftendeeprl.env_util import PacmanClingoHelper, get_gym_to_action_names
 from pacman_helper_asp import PacmanClingoHelperAsp
@@ -77,7 +78,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
         obs_features = feature_extractor.getFeatures(raw_state,action)
         obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
         
-        action = get_action(model, obs, shield, obs_flat, rule_chooser, cfg.training.algorithm, act_logits, action_tensor, last_action)
+        action, triggered_rules = get_action(model, obs, shield, obs_flat, rule_chooser, cfg.training.algorithm, act_logits, action_tensor, last_action)
 
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(env.unwrapped.game.state)
@@ -96,7 +97,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
             print(less_violations_possible)
             try:
                 change_index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
-                update_ruleset(last_n_states[change_index], rule_chooser, last_action)
+                update_ruleset(last_n_states[change_index], rule_chooser, last_action, triggered_rules, cfg.env, cfg.rules.feature_extractor)
             except:
                 log.info("Nothing to update, the number of violations cannot be decreased reliably.")
 
@@ -112,22 +113,37 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
 
 
 
-def update_ruleset(state, rule_chooser, action):
-    # TODO
-    return
+def update_ruleset(state, rule_chooser, action, triggered_rules, env_info, feature_extractor):
+    if triggered_rules != None:
+        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(env_info.name, env_info.level, feature_extractor)
+        (pos_rules_triggered, neg_rules_triggered) = triggered_rules
+        for rule in neg_rules_triggered:
+            has_rule_only_categorical_features(rule, categorical_features)
+        return
+
+
+
+def has_rule_only_categorical_features(rule, categorical_features):
+    rule_features = rule.strip(".-").split("action(")[1][6:].split(",")
+    for f in rule_features:
+        f_num = int(f.strip("f")[:-3])
+        if not f_num in categorical_features:
+            return False
+    return True
+
 
 
 def get_action(model, obs, shield, obs_flat, rule_chooser, algo_name, act_logits, action_tensor, last_action):
     action, _states = model.predict(obs)
-    triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
+    triggers,triggered_actions, triggered_rules= shield.does_rule_trigger(obs_flat,rule_chooser)
 
     if triggers:
-        (pos_triggered, neg_triggered) = triggered
-        changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+        (pos_actions_triggered, neg_actions_triggered) = triggered_actions
+        changed_action = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
                                         last_action,change_type="favor_cancel")
         if changed_action is not None:
             action = changed_action
-    return action
+    return action, triggered_rules
 
 
 # adapted from legible

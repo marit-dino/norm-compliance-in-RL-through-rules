@@ -136,7 +136,7 @@ class AspShield(Shield):
             triggered_actions_rules = [item.arguments for item in res[0] if (item.name == "triggered_by")]
             triggered_actions = list(set([int(str(item[1])) for item in triggered_actions_rules]))
             triggered_actions_rules = [self.transform_triggered_rule(rule_action, rules) for rule_action in triggered_actions_rules]
-            return triggered_actions
+            return triggered_actions, triggered_actions_rules
 
     def transform_rule(self, rule, i):
         action = rule.rpartition("action(")[2].split(")")[0]
@@ -145,8 +145,8 @@ class AspShield(Shield):
         return ret1, ret2
     
     def transform_triggered_rule(self, rule_action, rules):
-        # TODO get original rule back
-        return 
+        triggered_str = f", triggered_by({rule_action[0]}, {rule_action[1]})."
+        return list(filter(lambda r: r.endswith(triggered_str), rules))[0].rsplit(triggered_str)[0] + "."
 
 
     def does_rule_trigger(self,obs, rule_chooser : RuleChooser):
@@ -154,23 +154,23 @@ class AspShield(Shield):
         facts = self.raw_features_into_facts(features)
 
         rules = rule_chooser.choose_rules()
-        pos_rules = [rt for i, r in enumerate(rules) if r.startswith("action") for rt in self.transform_rule(r, i) ]
-        neg_rules = [r for r in rules if r.startswith("-action")]
-        pos_triggered = self.get_trigger_action(pos_rules, facts)
-        neg_triggered = self.get_trigger_action(neg_rules, facts)
+        pos_rules = [rt for i, r in enumerate(rules) if r.startswith("action") for rt in self.transform_rule(r, i)]
+        neg_rules = [rt for i, r in enumerate(rules) if r.startswith("-action") for rt in self.transform_rule(r, i) ]
+        pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts)
+        neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts)
         if len(pos_triggered) == 0 and len(neg_triggered) == 0:
-            return False, None
+            return False, None, None
 
         # check for conflicts
         # if two positive actions trigger at the same time, just return negative, or do nothing?
         if len(pos_triggered) > 1:
-            return False, (None,neg_triggered)
+            return False, (None,neg_triggered), (pos_rules_triggered, neg_rules_triggered)
         # check for conflicts between negative and positive triggers
         for pos_action in pos_triggered:
             if pos_action in neg_triggered:
-                return False, None
+                return False, None, (pos_rules_triggered, neg_rules_triggered)
         # there can only be one positive
-        return True,(pos_triggered[0] if pos_triggered else None,neg_triggered)
+        return True,(pos_triggered[0] if pos_triggered else None,neg_triggered), (pos_rules_triggered, neg_rules_triggered)
 
     def get_blocked_actions(self, state):
         features = self.raw_features(state)
