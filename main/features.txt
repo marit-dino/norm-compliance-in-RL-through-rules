@@ -78,29 +78,4 @@ angles:
 7: west
 8: north-west
 
-action(0) :- f52(1), f1(1).
-north :- caps dist 1, y 1
-
-action(3) :- f61(1), f34(9).
-west :- closest food west, g1 dist 9
-
-action(2) :- f60(1), f34(8).
-east :- closest food east, g1 8 dist
-
-action(3) :- f61(1), f4(0).
-west :- closest food west, notpossible to go east
-
-action(3) :- f61(1), f34(2).
-west :- closest food west, g1 dist 2
-
-action(2) :- f60(1), f34(6).
-east :-  closest food east, g1 6 dist
-
--action(1) :- f59(0), f1(0)      accuracy = 1.0, coverage = 0.35127002389592
-not south :- closest food Not north, y = 0
-
--action(0) :- f58(0), f1(0)      accuracy = 0.9841168996188056, coverage = 0.2786087264359678
-not north :- closest food Not north, y = 0
-
--action(2) :- f4(0) 
-not east :- not possible to go east
+direction: direction for distance

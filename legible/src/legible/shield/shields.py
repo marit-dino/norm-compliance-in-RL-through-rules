@@ -44,16 +44,24 @@ class RuleChooser:
 
     def select_rules(self, rules_list_para, return_keys=False):
         selected = []
-        rule_keys = []
+        rule_keys = []       
         for rule_index in rules_list_para:
             if rule_index < len(self.sorted_enforce_rules):
                 rule_key = self.sorted_enforce_rules[rule_index]
                 rule_keys.append(rule_key)
                 selected.extend(self.shield.enforceable_rules[rule_key])
             else:
-                rule_key = self.sorted_cancel_rules[rule_index - len(self.sorted_enforce_rules)]
-                rule_keys.append(rule_key)
-                selected.extend(self.shield.cancelable_rules[rule_key])
+                try:
+                    rule_key = self.sorted_cancel_rules[rule_index - len(self.sorted_enforce_rules)]
+                    rule_keys.append(rule_key)
+                    selected.extend(self.shield.cancelable_rules[rule_key])
+                except:
+                    print(rules_list_para)
+                    print(rule_index)
+                    print(len(self.sorted_cancel_rules))
+                    print(self.sorted_cancel_rules)
+                    print(len(self.sorted_enforce_rules))
+                    print(self.sorted_enforce_rules)
         if return_keys:
             return selected, rule_keys
         else:
@@ -122,16 +130,22 @@ class AspShield(Shield):
         self.categorical_features = categorical_features
         self.nr_rules = len(self.pos_rules_list) + len(self.neg_rules_list)
 
+
+    def add_neg_rule(self, rule_str):
+        self.all_neg_rules += f"\n{rule_str}"
+        self.neg_rules_list.append(rule_str)
+        self.nr_rules += 1
+
     def get_trigger_action(self, rules,facts):
         if len(rules) == 0:
-            return []
+            return [], []
         res = getModels(generation="",
                         rules="\n".join(rules),
                         constraint="",
                         obs=" ".join(facts))
 
         if len(res) == 0:
-            return []
+            return [], []
         else:
             triggered_actions_rules = [item.arguments for item in res[0] if (item.name == "triggered_by")]
             triggered_actions = list(set([int(str(item[1])) for item in triggered_actions_rules]))
@@ -187,10 +201,10 @@ class AspShield(Shield):
         neg_actions = [int(str(item.arguments[0])) for item in res[0] if (
                 item.name == "action") and (not item.positive)]
         neg_actions.sort()
-        if neg_actions == self.actions:
-            print("Tried to block all actions, blocking none")
-            return []
-        # print(neg_actions)
+        # if neg_actions == self.actions:
+        #     # print("Tried to block all actions, blocking none")
+        #     return []
+        # # print(neg_actions)
         return neg_actions
 
     def discretize(self,fvs):

@@ -6,14 +6,14 @@ log = logging.getLogger(__name__)
 def violated_vegetarian(state):
     if state.data._eaten[2]:
         log.info("norm 'vegetarian' violated")
-        return True
-    return False
+        return 1
+    return 0
 
 def violated_vegan(state):
     if state.data._eaten[1] or state.data._eaten[2]:
         log.info("norm 'vegan' violated")
-        return True
-    return False
+        return 1
+    return 0
 
 
 NORM_CHECKS = {
@@ -22,8 +22,8 @@ NORM_CHECKS = {
 }
 
 
-def violations_detected(norms, state):
+def num_violations_detected(norms, state):
+    violations = 0
     for norm in norms:
-        if NORM_CHECKS[norm](state):
-            return True
-    return False
+        violations += NORM_CHECKS[norm](state)
+    return violations

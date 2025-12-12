@@ -15,4 +15,7 @@ Open tasks:
 - [ ] attributions for legible, oftendeeprl
 - [x] (re)check (categorical) features in rule mining
 - [x] clean up episode data collection
+- [ ] (don't) consider (absolute) features e.g. x, y in some rules?
+- [ ] rule pruning?
+- [ ] rule tag for creation
 

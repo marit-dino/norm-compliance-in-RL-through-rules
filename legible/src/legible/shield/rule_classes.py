@@ -54,10 +54,11 @@ class RuleHead:
 
 
 class Rule:
-    def __init__(self, polarity : bool,rule_head : RuleHead, rule_body : RuleBody):
+    def __init__(self, polarity : bool,rule_head : RuleHead, rule_body : RuleBody, mined = True):
         self.polarity = polarity
         self.rule_head = rule_head
         self.rule_body = rule_body
+        self.mined = mined
 
     def __eq__(self, other):
         if isinstance(other, Rule):
@@ -83,7 +84,7 @@ def parse_body_string(body_str) -> RuleBody:
     body = []
     for cond_str in body_str_split:
         cond_str = cond_str.strip()
-        cond_matcher = re.match(r'f(\d+)\((\d+)\)',cond_str)
+        cond_matcher = re.match(r'f(\d+)\((-?\d+)\)',cond_str)
         if cond_matcher is None:
             print(cond_str)
         matched_groups = cond_matcher.groups()
@@ -93,7 +94,7 @@ def parse_body_string(body_str) -> RuleBody:
     return RuleBody(body)
 
 
-def string_to_rule(rule_string : str) -> Rule :
+def string_to_rule(rule_string : str, mined = False) -> Rule :
     polarity = False if rule_string.startswith("-") else True
     if not polarity:
         rule_string = rule_string[1:]
@@ -103,7 +104,7 @@ def string_to_rule(rule_string : str) -> Rule :
     head_match = re.search(r"\d+", head_str)
     action = int(head_match.group())
     body = parse_body_string(body_str)
-    return Rule(polarity,RuleHead(action),body)
+    return Rule(polarity,RuleHead(action),body, mined)
 
 
 def contains_fact(rule : Rule, feature, feature_valuation):
