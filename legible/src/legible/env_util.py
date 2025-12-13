@@ -26,6 +26,6 @@ def create_environment_and_modelname_for_oftendeeprl(algo_name, env_name, mode, 
         env = create_pacman_env(env_name, feature_extractor, mode, scale="dqn-n" in algo_name, render_mode="none")
     else:
         raise Exception("Not supported")
-    model_path = f"../pickles/models/{model_name}"
+    model_path = f"./pickles/models/{model_name}"
 
     return env, model_name, model_path

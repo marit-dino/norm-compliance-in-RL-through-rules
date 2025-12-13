@@ -9,7 +9,7 @@ from legible.rule_learning.util import load_model
 from legible.feature_and_rule_learn import get_features_and_failure_indication
 from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
 from oftendeeprl.env_util import PacmanClingoHelper, get_gym_to_action_names
-from pacman_helper_asp import PacmanClingoHelperAsp
+from pacman_helper_asp import PacmanViolationClingoHelper
 import sys, logging, torch
 import check_norms
 from os import listdir
@@ -21,20 +21,18 @@ log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def setup_update(cfg : DictConfig) -> None:
-    norm_descriptor = ""
-    for norm in cfg.norms:
-        norm_descriptor += norm + "_"
-    norm_descriptor += str(cfg.asp.horizon) + "_" + str(cfg.asp.radius)
+    norm_descriptor = f"{'_'.join(cfg.norms)}"
+    config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
-                                                                                    cfg.env.level, norm_descriptor, 
+                                                                                    cfg.env.level, config_str, 
                                                                                     cfg.training.steps_initial, cfg.training.steps_norm,
                                                                                     cfg.training.feature_extractor)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     num_actions = env.action_space.n
     action_tensor = torch.tensor(range(num_actions), device=device)
 
-    model_number = get_model_number(cfg, norm_descriptor)
+    model_number = get_model_number(cfg, config_str)
     model = load_model(model_path + f"_{model_number}","norm_guided_dqn",env=env,exact_match=True)
     shield_number = get_shield_number(cfg)
 
@@ -49,9 +47,8 @@ def setup_update(cfg : DictConfig) -> None:
     assert hasattr(shield, 'enforceable_rules')
     assert hasattr(shield, 'cancelable_rules')
 
-    # TODO fix names
-    update(env, model, action_tensor, shield, rule_chooser, cfg)
-    update(env, model, action_tensor, shield, rule_chooser, cfg)
+    update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
+    update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
 
 
 
@@ -60,7 +57,7 @@ def setup_update(cfg : DictConfig) -> None:
 
 
 # adapted from legible
-def update(env, model, action_tensor, shield, rule_chooser, cfg):
+def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon+1)
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
@@ -75,7 +72,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     # TODO determine vegetarian/norms
     last_n_states.append(env.unwrapped.game.state)
-    asp_helper = PacmanClingoHelperAsp(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), vegetarian=True, num_norms=len(cfg.norms))
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), vegetarian=True, num_norms=len(cfg.norms))
 
 
     # TODO until convergence etc.
@@ -89,7 +86,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
         obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
         
         if len(shield.get_blocked_actions(obs_flat)) == 4:
-            update_ruleset(last_n_states[-2], rule_chooser, shield, last_n_actions[-2], last_n_triggered_rules[-2], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+            update(last_n_states[-2], rule_chooser, shield, last_n_actions[-2], last_n_triggered_rules[-2], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
             i = i-1
             last_n_actions.pop
             last_n_states.pop
@@ -117,7 +114,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
             print(less_violations_possible)
             # try:
             change_index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
-            update_ruleset(last_n_states[change_index], rule_chooser, shield, last_n_actions[-1], triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+            update(last_n_states[change_index], rule_chooser, shield, last_n_actions[-1], triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
             # except:
             #     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
 
@@ -137,7 +134,7 @@ def update(env, model, action_tensor, shield, rule_chooser, cfg):
     
 
 
-def update_ruleset(state, rule_chooser, shield, action, triggered_rules, env_info, feature_extractor_name, feature_extractor, exclude_features):
+def update(state, rule_chooser, shield, action, triggered_rules, env_info, feature_extractor_name, feature_extractor, exclude_features):
     state_features = feature_extractor.getFeatures(state,action)
     if triggered_rules != None:
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(env_info.name, env_info.level, feature_extractor_name)
@@ -233,7 +230,7 @@ def number_of_ghosts(level):
 def get_model_number(cfg, norm_descriptor):
     if cfg.rules.model_number is None:
         model_name = f"norm_guided_dqn__{norm_descriptor}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.env.level}_{cfg.training.feature_extractor}"
-        norm_guided_models = [f for f in listdir('../pickles/models') if isfile(join('../pickles/models', f)) 
+        norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
                             and f.startswith(model_name)]
         if len(norm_guided_models) == 0:
             sys.exit("No policy found that matches the provided parameters.")

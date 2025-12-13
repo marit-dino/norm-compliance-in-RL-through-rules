@@ -6,8 +6,7 @@ from sb3_ext.clingoHelper import ClingoHelper
 from oftendeeprl.sb3_ext.pacman_helper import PacmanClingoHelper
 
 
-#TODO rename
-class PacmanClingoHelperAsp(PacmanClingoHelper):
+class PacmanViolationClingoHelper(PacmanClingoHelper):
 
     def __init__(self, horizon, radius, ghosts, vegetarian, num_norms):
         self.ctl = clingo.Control(
