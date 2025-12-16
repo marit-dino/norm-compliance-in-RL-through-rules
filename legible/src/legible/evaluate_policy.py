@@ -60,7 +60,7 @@ def create_rule_string_for_pos_neg(shield,shield_rule_nrs):
             rule_string += shield.neg_rules_list[shield_rule_nr - len(shield.pos_rules_list)] + "\n"
     return rule_string
 
-def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,action_tensor,last_action, change_type):
+def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,action_tensor,triggered_rules, change_type):
     if change_type == "favor_cancel":
         if len(neg_triggered) == 0:
             change_type = "rule_action"
@@ -72,14 +72,19 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         else:
             change_type = "cancel"
 
+    (pos_triggered_rules, neg_triggered_rules) = triggered_rules
+    pos_triggered_created_rules = list(filter(lambda r : not r[0].mined, pos_triggered_rules))
+    neg_triggered_created_rules = list(filter(lambda r : not r[0].mined, neg_triggered_rules))
+
     if "rule_action" in change_type:
         if action == pos_triggered:
-            return None # signal no change
+            return None, [] # signal no change
         else:
-            return  pos_triggered
+            corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action == pos_triggered, pos_triggered_created_rules))
+            return pos_triggered, corresponding_triggered_rules
     elif "cancel" == change_type:
         if len(neg_triggered) == 0:
-            return None
+            return None, []
         if algo_name == "ppo":
             for rule_action in neg_triggered:
                 act_logits[rule_action] = -1e6
@@ -94,7 +99,8 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
             if len(neg_triggered) < action_tensor.shape[0]:
                 for rule_action in neg_triggered:
                     act_logits[rule_action] = -1e6
-            return torch.argmax(act_logits)
+            corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action in neg_triggered, neg_triggered_created_rules))
+            return torch.argmax(act_logits), corresponding_triggered_rules
     else:
         raise Exception("Unsupported")
 

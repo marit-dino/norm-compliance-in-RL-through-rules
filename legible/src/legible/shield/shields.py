@@ -131,7 +131,7 @@ class AspShield(Shield):
         self.neg_rules_list.append(rule_str)
         self.nr_rules += 1
 
-    def get_trigger_action(self, rules,facts):
+    def get_trigger_action(self, rules, facts, original_rules):
         if len(rules) == 0:
             return [], []
         res = getModels(generation="",
@@ -144,7 +144,7 @@ class AspShield(Shield):
         else:
             triggered_actions_rules = [item.arguments for item in res[0] if (item.name == "triggered_by")]
             triggered_actions = list(set([int(str(item[1])) for item in triggered_actions_rules]))
-            triggered_actions_rules = [self.transform_triggered_rule(rule_action, rules) for rule_action in triggered_actions_rules]
+            triggered_actions_rules = [self.transform_triggered_rule(rule_action, rules, original_rules) for rule_action in triggered_actions_rules]
             return triggered_actions, triggered_actions_rules
 
     def transform_rule(self, rule, i):
@@ -153,9 +153,12 @@ class AspShield(Shield):
         ret2 = f"triggered_by({i}, {action}){rule.strip(f'-action({action})')}"
         return ret1, ret2
     
-    def transform_triggered_rule(self, rule_action, rules):
+    def transform_triggered_rule(self, rule_action, rules, original_rules):
         triggered_str = f", triggered_by({rule_action[0]}, {rule_action[1]})."
-        return list(filter(lambda r: r.endswith(triggered_str), rules))[0].rsplit(triggered_str)[0] + "."
+        rule_str = list(filter(lambda r: r.endswith(triggered_str), rules))[0].rsplit(triggered_str)[0] + "."
+        from shield.rule_classes import string_to_rule
+        # conversion to rule changes the order of the featuers, so "original_rules[rule_str]" does not work
+        return list(filter(lambda r: r[0] == (string_to_rule(rule_str)), original_rules.values()))[0]
 
 
     def does_rule_trigger(self,obs, rule_chooser : RuleChooser, rules_snapshot):

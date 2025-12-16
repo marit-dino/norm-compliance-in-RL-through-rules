@@ -1,5 +1,6 @@
 import hydra
 from omegaconf import DictConfig
+from util import RuleSnapshot
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, change_action
 from legible.shield.shields import RuleChooser 
@@ -54,10 +55,9 @@ def setup_update(cfg : DictConfig) -> None:
 
 
 
-
-
 # adapted from legible
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
+    # TODO move a part of this to  a setup method
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon+1)
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
@@ -80,7 +80,9 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     )
 
     # TODO until convergence etc.
-    for i in range(50000):
+    for i in range(25000):
+        if i % 1000 == 0:
+            print(i)
         total_violations += last_n_violations[-1]
         action, _states = model.predict(obs)
         q_values = policy.q_net(obs_t).squeeze()
@@ -96,7 +98,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             last_n_triggered_rules.pop
             continue
 
-        action, triggered_rules = get_action(model, obs, shield, obs_flat, rule_chooser, cfg.training.algorithm, act_logits, action_tensor, last_n_actions[-1])
+        action, triggered_rules = get_action(model, obs, shield, obs_flat, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
         last_n_triggered_rules.append(triggered_rules)
 
         obs, reward, term, trunc, info = env.step(action)
@@ -144,8 +146,8 @@ def update(state, rule_chooser, shield, action, triggered_rules, env_info, featu
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(env_info.name, env_info.level, feature_extractor_name)
         (pos_rules_triggered, neg_rules_triggered) = triggered_rules
         for rule in neg_rules_triggered + pos_rules_triggered:
-            if has_rule_only_categorical_features(rule, categorical_features):
-                rule = update_categorical(rule, state_features)
+            if has_rule_only_categorical_features(rule[0], categorical_features):
+                rule[0] = update_categorical(rule[0], state_features)
     
     return add_neg_rule(state_features, action, shield, rule_chooser, exclude_features)
 
@@ -198,25 +200,29 @@ def update_categorical(rule, state_features):
 
 # TODO check state instead?
 def has_rule_only_categorical_features(rule, categorical_features):
-    rule_features = rule.strip(".-").split("action(")[1][6:].split(",")
+    rule_features = rule.rule_body.conditions #strip(".-").split("action(")[1][6:].split(",")
     for f in rule_features:
-        f_num = int(f.strip("f")[:-3])
-        if not f_num in categorical_features:
+        if not f.feature in categorical_features:
             return False
     return True
 
 
 
-def get_action(model, obs, shield, obs_flat, rule_chooser, algo_name, act_logits, action_tensor, last_action):
+def get_action(model, obs, shield, obs_flat, state, rule_chooser, rules_snapshot, algo_name, act_logits, action_tensor):
     action, _states = model.predict(obs)
 
-    triggers,triggered_actions, triggered_rules= shield.does_rule_trigger(obs_flat,rule_chooser)
+    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_flat,rule_chooser,rules_snapshot)
 
     if triggers:
         (pos_actions_triggered, neg_actions_triggered) = triggered_actions
-        changed_action = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
-                                        last_action,change_type="favor_cancel")
+        changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
+                                        triggered_rules, change_type="favor_cancel")
         if changed_action is not None:
+            if len(activated_created_rules) > 0:
+                log.info("Updated rule(s) used:")
+                print(state)
+                for r in activated_created_rules:
+                    print(r[0])
             action = changed_action
     return action, triggered_rules
 
@@ -228,13 +234,13 @@ def set_rules(shield):
     for pos_rule in shield.pos_rules_list:
         if len(pos_rule.strip()) == 0:
             continue
-        enforceable_rules[pos_rule] = [string_to_rule(pos_rule)]
+        enforceable_rules[pos_rule] = [string_to_rule(pos_rule, True)]
     for neg_rule in shield.neg_rules_list:
         if len(neg_rule.strip()) == 0:
             continue
-        cancelable_rules[neg_rule] = [string_to_rule(neg_rule)]
-    shield.enforceable_rules = turn_rules_to_str(enforceable_rules) if len(enforceable_rules) > 0 else dict()
-    shield.cancelable_rules = turn_rules_to_str(cancelable_rules) if len(cancelable_rules) > 0 else dict()
+        cancelable_rules[neg_rule] = [string_to_rule(neg_rule, True)]
+    shield.enforceable_rules = enforceable_rules
+    shield.cancelable_rules = cancelable_rules
     rule_chooser = RuleChooser(shield)
     rule_chooser.set_rules_list(list(range(0,len(list(enforceable_rules.keys()) + list(cancelable_rules.keys())))))
     return shield, rule_chooser
