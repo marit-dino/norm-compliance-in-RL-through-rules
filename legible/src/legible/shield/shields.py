@@ -42,36 +42,31 @@ class RuleChooser:
         self.shield = shield
         self.rules_list = None
 
-    def select_rules(self, rules_list_para, return_keys=False):
+    def select_rules(self, rules_snapshot, return_keys=False):
+        sorted_enforce_rules = sorted(rules_snapshot.enforceable_rules.keys())
+        sorted_cancel_rules = sorted(rules_snapshot.cancelable_rules.keys())
         selected = []
         rule_keys = []       
-        for rule_index in rules_list_para:
-            if rule_index < len(self.sorted_enforce_rules):
-                rule_key = self.sorted_enforce_rules[rule_index]
+        for rule_index in rules_snapshot.rule_indices:
+            if rule_index < len(sorted_enforce_rules):
+                rule_key = sorted_enforce_rules[rule_index]
                 rule_keys.append(rule_key)
-                selected.extend(self.shield.enforceable_rules[rule_key])
+                selected.extend(rules_snapshot.enforceable_rules[rule_key])
             else:
-                try:
-                    rule_key = self.sorted_cancel_rules[rule_index - len(self.sorted_enforce_rules)]
-                    rule_keys.append(rule_key)
-                    selected.extend(self.shield.cancelable_rules[rule_key])
-                except:
-                    print(rules_list_para)
-                    print(rule_index)
-                    print(len(self.sorted_cancel_rules))
-                    print(self.sorted_cancel_rules)
-                    print(len(self.sorted_enforce_rules))
-                    print(self.sorted_enforce_rules)
+                rule_key = sorted_cancel_rules[rule_index - len(sorted_enforce_rules)]
+                rule_keys.append(rule_key)
+                selected.extend(rules_snapshot.cancelable_rules[rule_key])
         if return_keys:
             return selected, rule_keys
         else:
             return selected
+        
     def set_rules_list(self,rules_list):
         self.rules_list = rules_list
-    def choose_rules(self):
+    def choose_rules(self,rules_snapshot):
         if self.rules_list is None:
             raise Exception("Rules list is not set")
-        return self.select_rules(self.rules_list)
+        return self.select_rules(rules_snapshot)
 
 # copied from asp shield
 def discretize(fvs, feature_indices, categorical_features, feature_intervals):
@@ -163,15 +158,15 @@ class AspShield(Shield):
         return list(filter(lambda r: r.endswith(triggered_str), rules))[0].rsplit(triggered_str)[0] + "."
 
 
-    def does_rule_trigger(self,obs, rule_chooser : RuleChooser):
+    def does_rule_trigger(self,obs, rule_chooser : RuleChooser, rules_snapshot):
         features = self.raw_features(obs)   
         facts = self.raw_features_into_facts(features)
 
-        rules = rule_chooser.choose_rules()
-        pos_rules = [rt for i, r in enumerate(rules) if r.startswith("action") for rt in self.transform_rule(r, i)]
-        neg_rules = [rt for i, r in enumerate(rules) if r.startswith("-action") for rt in self.transform_rule(r, i) ]
-        pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts)
-        neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts)
+        rules = rule_chooser.choose_rules(rules_snapshot)
+        pos_rules = [rt for i, r in enumerate(rules) if str(r).startswith("action") for rt in self.transform_rule(str(r), i)]
+        neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i) ]
+        pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts, rules_snapshot.enforceable_rules)
+        neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts, rules_snapshot.cancelable_rules)
         if len(pos_triggered) == 0 and len(neg_triggered) == 0:
             return False, None, None
 

@@ -74,6 +74,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_states.append(env.unwrapped.game.state)
     asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), vegetarian=True, num_norms=len(cfg.norms))
 
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
 
     # TODO until convergence etc.
     for i in range(50000):
@@ -81,8 +85,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         action, _states = model.predict(obs)
         q_values = policy.q_net(obs_t).squeeze()
         act_logits = q_values        
-        raw_state = env.unwrapped.game.state
-        obs_features = feature_extractor.getFeatures(raw_state,action)
+        obs_features = feature_extractor.getFeatures(last_n_states[-1],action)
         obs_flat = np.array([obs_features[j] for j in obs_features.keys()])
         
         if len(shield.get_blocked_actions(obs_flat)) == 4:
@@ -110,13 +113,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             for j, state in enumerate(last_n_states):
                 log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
                 if j < cfg.asp.horizon:
-                    less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), last_n_violations[-1], cfg.asp.horizon-j+1))
+                    less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
             print(less_violations_possible)
-            # try:
-            change_index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
-            update(last_n_states[change_index], rule_chooser, shield, last_n_actions[-1], triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
-            # except:
-            #     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
+            if True in less_violations_possible:
+                rules_snapshot = update(last_n_states[-2], rule_chooser, shield, last_n_actions[-2], triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+            else:
+                log.info("Nothing to update, the number of violations cannot be decreased reliably.")
 
         if term and reward > 0:
             win = True 
@@ -127,6 +129,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             last_n_states = deque(maxlen=cfg.asp.horizon+1)
             last_n_actions = deque(maxlen=cfg.asp.horizon+1)
             last_n_actions.append(None)
+            last_n_states.append(env.unwrapped.game.state)
+
 
     print(f"TOTAL VIOLATIONS: {total_violations}")
 
@@ -143,7 +147,7 @@ def update(state, rule_chooser, shield, action, triggered_rules, env_info, featu
             if has_rule_only_categorical_features(rule, categorical_features):
                 rule = update_categorical(rule, state_features)
     
-    add_neg_rule(state_features, action, shield, rule_chooser, exclude_features)
+    return add_neg_rule(state_features, action, shield, rule_chooser, exclude_features)
 
 
 def add_neg_rule(state_features, action, shield, rule_chooser, exclude_features):
@@ -154,12 +158,26 @@ def add_neg_rule(state_features, action, shield, rule_chooser, exclude_features)
     neg_rule = neg_rule[:-2] + "."
     cancelable_rule = dict()
     cancelable_rule[neg_rule] = [string_to_rule(neg_rule, False)]
-    rules_str = turn_rules_to_str(cancelable_rule)
-    shield.cancelable_rules.update(rules_str)
-    rule_chooser.rules_list.append(len(rule_chooser.rules_list))
-    new_sorted = sorted(shield.cancelable_rules.keys())
-    rule_chooser.sorted_cancel_rules = new_sorted
+
+    cancelable_rules_copy = shield.cancelable_rules.copy()
+    cancelable_rules_copy.update(cancelable_rule)
+
+    rule_chooser_rules_copy = rule_chooser.rules_list.copy()
+    rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
+
+    new_sorted = sorted(cancelable_rules_copy.keys())
+
     shield.add_neg_rule(neg_rule)
+    shield.cancelable_rules = cancelable_rules_copy
+    rule_chooser.set_rules_list(rule_chooser_rules_copy)
+    rule_chooser.sorted_cancel_rules = new_sorted
+
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = cancelable_rules_copy,
+    )
+    return rules_snapshot
+        
 
 # def adapt_pos_rule(state_features, rule, shield, rule_chooser, exclude_features):
 #     state_features = [f"f{i}({int(value)})" for i, (key, value) in enumerate(state_features.items()) if i not in exclude_features]
@@ -172,9 +190,10 @@ def add_neg_rule(state_features, action, shield, rule_chooser, exclude_features)
 #     rule_chooser.sorted_cancel_rules = sorted(shield.cancelable_rules.keys())
 
 def update_categorical(rule, state_features):
-    features_values_rule = rule.strip(".-").split("action(")[1][6:].split(",")
-    state_features = [f"f{i}({int(value) if isinstance(value, bool) else value})" for i, (key, value) in enumerate(state_features.items())]
+    # features_values_rule = rule.strip(".-").split("action(")[1][6:].split(",")
+    # state_features = [f"f{i}({int(value) if isinstance(value, bool) else value})" for i, (key, value) in enumerate(state_features.items())]
     # TODO
+    return
 
 
 # TODO check state instead?
