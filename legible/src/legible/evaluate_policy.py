@@ -100,7 +100,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
                 for rule_action in neg_triggered:
                     act_logits[rule_action] = -1e6
             corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action in neg_triggered, neg_triggered_created_rules))
-            return torch.argmax(act_logits), corresponding_triggered_rules
+            return torch.argmax(act_logits).cpu().numpy(), corresponding_triggered_rules
     else:
         raise Exception("Unsupported")
 

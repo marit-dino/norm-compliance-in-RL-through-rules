@@ -19,4 +19,5 @@ Open tasks:
 - [ ] rule pruning?
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
+- [ ] check how intervals affect mined rules
 

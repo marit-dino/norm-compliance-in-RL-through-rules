@@ -162,14 +162,19 @@ class AspShield(Shield):
 
 
     def does_rule_trigger(self,obs, rule_chooser : RuleChooser, rules_snapshot):
+        print(obs)
         features = self.raw_features(obs)   
+        print(features)
         facts = self.raw_features_into_facts(features)
+        print(facts)
 
         rules = rule_chooser.choose_rules(rules_snapshot)
         pos_rules = [rt for i, r in enumerate(rules) if str(r).startswith("action") for rt in self.transform_rule(str(r), i)]
         neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i) ]
         pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts, rules_snapshot.enforceable_rules)
         neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts, rules_snapshot.cancelable_rules)
+        # print(facts)
+        # print(neg_rules)
         if len(pos_triggered) == 0 and len(neg_triggered) == 0:
             return False, None, None
 
@@ -211,18 +216,19 @@ class AspShield(Shield):
                 continue
             else:
                 enum_interval = enumerate(self.feature_intervals[fi])
-                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval)
+                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) #replace_single_cont_value(fvs[i], fi, enum_interval) TODO can i do this?
         return fvs
 
-    def raw_features(self, state):
-        features_values = state[self.feature_indices]
-        features_values = self.discretize(features_values).astype(int)
+    def raw_features(self, obs):
+        features_values = obs[self.feature_indices]
+        features_values = self.discretize(obs).astype(int)
         return features_values
 
     def raw_features_into_facts(self, features_values):
         facts_list = list(
             map(lambda fi_value: f"f{fi_value[0]}({fi_value[1]}).",
                 zip(self.feature_indices, features_values.tolist())))
+        #print(facts_list)
         return facts_list
 
     def get_nr_rules(self):

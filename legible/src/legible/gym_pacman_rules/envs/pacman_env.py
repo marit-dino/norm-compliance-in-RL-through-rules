@@ -2,6 +2,7 @@ import gymnasium
 from gymnasium import spaces
 from gymnasium.utils import seeding
 import numpy as np
+import copy
 
 headless = True
 
@@ -338,3 +339,36 @@ class PacmanEnv(gymnasium.Env):
             self.observation_space = self.features.get_obs_space(nr_ghosts)
         else:
             raise Exception(f"Feature extractor '{self.features}' Not implemented")
+        
+    
+    def save_state(self):
+        return {
+            "game_state": copy.deepcopy(self.game.state),
+            "terminated": self.terminated,
+            "truncated": self.truncated,
+            "np_random": copy.deepcopy(self.np_random),
+            "step_counter": self.step_counter,
+            "cum_reward": self.cum_reward,
+            "location":  self.location,
+            "ghostLocations": copy.deepcopy(self.ghostLocations),
+            "ghostInFrame": self.ghostInFrame,
+            "location_history": copy.deepcopy(self.location_history),
+            "orientation": self.orientation,
+            "orientation_history": copy.deepcopy(self.orientation_history),
+            "illegal_move_counter": self.illegal_move_counter
+        }
+    
+    def load_state(self, state):
+        self.game.state = copy.deepcopy(state["game_state"])
+        self.step_counter = state["step_counter"]
+        self.cum_reward = state["cum_reward"]
+        self.terminated = state["terminated"]
+        self.truncated = state["truncated"]
+        self.np_random = copy.deepcopy(state["np_random"])
+        self.illegal_move_counter = state["illegal_move_counter"]
+        self.location = state["location"]
+        self.ghostLocations = copy.deepcopy(state["ghostLocations"])
+        self.ghostInFrame = state["ghostInFrame"]
+        self.location_history = copy.deepcopy(state["location_history"])
+        self.orientation = state["orientation"]
+        self.orientation_history = copy.deepcopy(state["orientation_history"])

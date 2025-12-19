@@ -29,15 +29,16 @@ from gym_pacman_rules.envs.pacman import PacmanRules, SCARED_TIME, COLLISION_TOL
 from gym_pacman_rules.envs.util import Counter,nearestPoint
 
 
-def features_dict_to_array(features : Counter):
+def features_dict_to_array(features : Counter, ordering = None):
     pac_map = features.pop('map',None)
     sorted_features = sorted(list(features.items()),key=lambda x: x[0])
     ext_features = list(filter(lambda x : x[0].startswith("#-of-ghosts-1-step-away-") or
-                      x[0].startswith("#-of-scared-ghosts-1-step-away-"), sorted_features))
+                      x[0].startswith("#-of-scared-ghosts   -1-step-away-"), sorted_features))
     non_ext_features = list(filter(lambda x : not(x[0].startswith("#-of-ghosts-1-step-away-") or
                       x[0].startswith("#-of-scared-ghosts-1-step-away-")), sorted_features))
-    sorted_features = non_ext_features + ext_features
+    #sorted_features = non_ext_features + ext_features
     other_features = np.array(list(zip(*sorted_features))[1])
+    return other_features
     if pac_map is not None:
         return np.concatenate((other_features,pac_map.flatten()))
     else:
@@ -490,12 +491,13 @@ class ExtendedExtractor8(FeatureExtractor):
             is_scared = 1 if g.isScared() else 0
             g_x,g_y = g.getPosition()
             features[f"ghost-{i}-scared"] = is_scared
-            features[f"ghost-{i}-scaredtime"] = g.scaredTimer / SCARED_TIME
+            features[f"ghost-{i}-scaredtime"] = int(g.scaredTimer / SCARED_TIME)
             features[f"ghost-{i}-x"] = g_x
             features[f"ghost-{i}-y"] = g_y
             g_dist, g_dir = ghostDistance((x,y),g.getPosition(),walls,legal_neighbor_cache = self.legal_neighbor_cache,return_dir=True)
 
-            features[f"ghost-{i}-dist"] = g_dist
+            #TODO check if this works out (same for scared time)
+            features[f"ghost-{i}-dist"] = int(g_dist)
             # features[f"ghost-{i}-dir"] = g_dir if g_dir is not None else -1
 
             add_direction_ohe(features,g_dir if g_dir is not None else Directions.STOP,f"ghost-{i}-dir")
