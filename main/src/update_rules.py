@@ -55,7 +55,6 @@ def setup_update(cfg : DictConfig) -> None:
     }
     ordered_feature_indices = [feature_to_index[fv[0]] for fv in ordered_features]
 
-    #TODO bring into right order and set as feature indices of shield
     shield.feature_indices = ordered_feature_indices
     shield, rule_chooser = set_rules(shield)
     assert hasattr(shield, 'enforceable_rules')
@@ -118,7 +117,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         # print(env.unwrapped.game.state)
         action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
         last_n_triggered_rules.append(triggered_rules)
-
+        
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
         last_n_actions.append(action)
@@ -190,12 +189,11 @@ def update(state, obs_rules, rule_chooser, shield, action, triggered_rules, env_
 
 
 def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
-    #print(f"obs_rules: {obs_rules}")
-    #features_values = shield.discretize(obs_rules[shield.feature_indices]).astype(int)    
-    #print(f"discretized: {features_values}")
+    features_values = obs_rules.copy()
+    features_values = shield.discretize(features_values).astype(int)
     relevant_facts = [
-        f"f{fi}({int(value)})" #TODO change?
-        for fi, value in zip(shield.feature_indices, obs_rules)
+        f"f{fi}({value})"
+        for fi, value in zip(shield.feature_indices, features_values)
         if fi not in exclude_features
     ]
     neg_rule = f"-action({action}) :- "
@@ -266,7 +264,7 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
         (pos_actions_triggered, neg_actions_triggered) = triggered_actions
         #TODO change to enforce favoring
         changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
-                                        triggered_rules, change_type="favor_cancel")
+                                        triggered_rules, change_type="favor_enforce")
         if changed_action is not None:
             if len(activated_created_rules) > 0:
                 log.info("Updated rule(s) used:")
