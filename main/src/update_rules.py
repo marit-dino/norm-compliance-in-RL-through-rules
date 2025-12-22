@@ -75,7 +75,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
     last_n_actions = deque(maxlen=cfg.asp.horizon+1)
     last_n_triggered_rules = deque(maxlen=cfg.asp.horizon+1)
-    prev_env_states = deque(maxlen=2)
+    prev_env_states = deque(maxlen=cfg.asp.horizon+1)
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -102,14 +102,22 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         q_values = policy.q_net(obs_t).squeeze()
         act_logits = q_values        
         obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
+        prev_env_states.append(env.unwrapped.save_state())
+
         #obs_flat = np.array([val for (f, val) in obs_rules])
         
         if len(shield.get_blocked_actions(obs_rules)) == 4:
             log.info("Backtracking, all actions are blocked")
             prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
             # TODO differentiate between mined/created, fix indices
-            # TODO fix last n states index?
-            update(last_n_states[-1], prev_obs, rule_chooser, shield, prev_action, prev_triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+            # TODO what if we backtrack more than the deque is long?
+            # triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
+
+            print(last_n_actions[-1])
+            for r in last_n_triggered_rules[-1]:
+                print(r)
+            update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+            print(f"Now in \n {env.unwrapped.game.state}")
             i = i-2
             continue
         
@@ -121,7 +129,6 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
         last_n_actions.append(action)
-        prev_env_states.append(env.unwrapped.save_state())
         last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
 
 
@@ -129,6 +136,11 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         obs_t = obs_t.to(action_tensor.device)
 
         if last_n_violations[-1] > 0:
+            print(action)
+            if triggered_rules != None:
+                (pos, neg) = triggered_rules
+                for r in neg + pos:
+                    print(r[0])
             less_violations_possible = []
             last_n_states_copy = last_n_states.copy()
             for j, state in enumerate(last_n_states):
@@ -158,7 +170,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             last_n_states.append(env.unwrapped.game.state)
 
 
-    print(f"TOTAL VIOLATIONS: {total_violations}")
+    log.info(f"Total Violations: {total_violations}")
 
 
 def backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=True):
@@ -166,8 +178,7 @@ def backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_st
     prev_env_states.pop()
     if violation:
         last_n_violations.pop()
-    #TODO check whether this is the right action
-    prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=last_n_actions[-1]))
+    prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
     return last_n_states.pop(), last_n_actions.pop(), last_n_triggered_rules.pop(), prev_obs
 
 
@@ -183,7 +194,6 @@ def update(state, obs_rules, rule_chooser, shield, action, triggered_rules, env_
             if has_rule_only_categorical_features(rule[0], categorical_features):
                 state_features = feature_extractor.getFeatures(state,action)
                 rule[0] = update_categorical(rule[0], state_features)
-    
     return add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features)
 
 
@@ -200,7 +210,7 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     for f in relevant_facts:
         neg_rule += f"{f},"
     neg_rule = neg_rule[:-1] + "."
-    print(neg_rule)
+    log.info(f"Added rule: {neg_rule}")
     cancelable_rule = dict()
     cancelable_rule[neg_rule] = [string_to_rule(neg_rule, False)]
 
@@ -253,7 +263,7 @@ def has_rule_only_categorical_features(rule, categorical_features):
 
 def get_action(model, obs, obs_rules, shield, state, last_action, feature_extractor, rule_chooser, rules_snapshot, algo_name, act_logits, action_tensor):
     action, _states = model.predict(obs)
-    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot    )
+    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
 
     # if triggered_rules != None:
     #     (pos, neg) = triggered_rules
@@ -267,10 +277,7 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
                                         triggered_rules, change_type="favor_enforce")
         if changed_action is not None:
             if len(activated_created_rules) > 0:
-                log.info("Updated rule(s) used:")
-                print(state)
-                for r in activated_created_rules:
-                    print(r[0])
+                log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\n in state\n {state}")
             action = changed_action
     return action, triggered_rules
 
