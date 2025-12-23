@@ -102,22 +102,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         q_values = policy.q_net(obs_t).squeeze()
         act_logits = q_values        
         obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
-        prev_env_states.append(env.unwrapped.save_state())
 
         #obs_flat = np.array([val for (f, val) in obs_rules])
         
         if len(shield.get_blocked_actions(obs_rules)) == 4:
-            log.info("Backtracking, all actions are blocked")
-            prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
-            # TODO differentiate between mined/created, fix indices
-            # TODO what if we backtrack more than the deque is long?
-            # triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
-
-            print(last_n_actions[-1])
-            for r in last_n_triggered_rules[-1]:
-                print(r)
-            update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
-            print(f"Now in \n {env.unwrapped.game.state}")
+            all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
+            
             i = i-2
             continue
         
@@ -130,6 +120,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
         last_n_actions.append(action)
         last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
+        prev_env_states.append(env.unwrapped.save_state())
 
 
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -181,6 +172,33 @@ def backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_st
     prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
     return last_n_states.pop(), last_n_actions.pop(), last_n_triggered_rules.pop(), prev_obs
 
+
+
+def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg):
+    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
+    (pos_rules_triggered, neg_rules_triggered) = triggered_rules
+    neg_actions = [r[0].rule_head.action for r in neg_rules_triggered]
+    print(neg_actions)
+    blocked_actions = set(neg_actions)
+    actions_blocked_by_created_rules = {a: True for a in blocked_actions}
+
+    for r in neg_rules_triggered:
+        if r[0].mined == True:
+            actions_blocked_by_created_rules[r[0].rule_head.action] = False
+        print(r[0])
+
+    
+    print(actions_blocked_by_created_rules)
+    if False not in list(actions_blocked_by_created_rules.values):
+        log.info("Backtracking, all actions are blocked by created rules")
+        prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
+        # TODO what about continue?
+        # TODO what if we backtrack more than the deque is long?
+        update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+        print(f"Now in \n {env.unwrapped.game.state}")
+    else:
+        log.info("All actions are blocked, adapting a mined rule")
+        # TODOs
 
 
 
@@ -277,7 +295,7 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
                                         triggered_rules, change_type="favor_enforce")
         if changed_action is not None:
             if len(activated_created_rules) > 0:
-                log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\n in state\n {state}")
+                log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
             action = changed_action
     return action, triggered_rules
 

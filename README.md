@@ -20,5 +20,5 @@ Open tasks:
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
 - [x] check how intervals affect mined rules
-- [ ] what to do if backtracking exceeds horizon?
+- [ ] what to do if backtracking exceeds horizon? (should this even happen?)
 
