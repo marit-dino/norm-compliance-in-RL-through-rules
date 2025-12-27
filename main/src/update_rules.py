@@ -214,13 +214,10 @@ def only_enumerable_features_difference(rule, enumerable_features, categorical_f
     occurring_features = [f.feature for f in rule.rule_body.conditions]
     print("occurring features in rule: ", occurring_features)
     differing_features = [f for f in list(feature_facts.keys()) if f not in occurring_features]
-    print("feature facts:", feature_facts)
-    print("differing features: ")
+    print("differing features: ", differing_features)
+    
     for f in differing_features:
-        print(f"feature {f.feature} : rule value {f.valuation}")
-
-    for f in differing_features:
-        if not f.feature in categorical_features and f.feature not in enumerable_features:
+        if not (f in categorical_features and f not in enumerable_features):
             return False
     return True
 
@@ -272,6 +269,7 @@ def remove_rule(rule, shield, rule_chooser):
         rule_chooser_rules_copy = rule_chooser.rules_list.copy()
         rule_chooser_rules_copy.pop()
         cancelable_rules_copy = shield.cancelable_rules.copy()
+        print(cancelable_rules_copy)
         cancelable_rules_copy.pop(str(rule))
         new_sorted = sorted(cancelable_rules_copy.keys())
 
