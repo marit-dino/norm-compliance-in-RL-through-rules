@@ -93,7 +93,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         cancelable_rules = shield.cancelable_rules,
     )
 
-    # TODO until convergence etc.
+    # TODO until convergence etc. / based on number of episodes
     for i in range(25000):
         if i % 1000 == 0:
             print(i)
@@ -103,16 +103,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         act_logits = q_values        
         obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
 
-        #obs_flat = np.array([val for (f, val) in obs_rules])
         
         if len(shield.get_blocked_actions(obs_rules)) == 4:
             all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
-            
-            i = i-2
-            continue
-        
-        # print("------------------------------------")
-        # print(env.unwrapped.game.state)
+                    
         action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
         last_n_triggered_rules.append(triggered_rules)
         
@@ -122,16 +116,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
         prev_env_states.append(env.unwrapped.save_state())
 
-
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
 
         if last_n_violations[-1] > 0:
-            print(action)
-            if triggered_rules != None:
-                (pos, neg) = triggered_rules
-                for r in neg + pos:
-                    print(r[0])
             less_violations_possible = []
             last_n_states_copy = last_n_states.copy()
             for j, state in enumerate(last_n_states):
@@ -140,11 +128,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
             print(less_violations_possible)
             if True in less_violations_possible:
-               
-                #TODO put in method
                 prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
                 rules_snapshot = update(last_n_states[-1], prev_obs, rule_chooser, shield, prev_action, prev_triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
-                i = i - 2
                 continue
             else:
                 log.info("Nothing to update, the number of violations cannot be decreased reliably.")
@@ -187,33 +172,195 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
         print(r[0])
 
-    
-    print(actions_blocked_by_created_rules)
-    if False not in list(actions_blocked_by_created_rules.values):
-        log.info("Backtracking, all actions are blocked by created rules")
+    if False not in list(actions_blocked_by_created_rules.values()):
+        log.info(f"Backtracking, all actions are blocked by created rules")
         prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
-        # TODO what about continue?
-        # TODO what if we backtrack more than the deque is long?
+        # TODO what if we backtrack more than the deque is long? (can this even happen?)
         update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
         print(f"Now in \n {env.unwrapped.game.state}")
     else:
-        log.info("All actions are blocked, adapting a mined rule")
-        # TODOs
+        log.info(f"All actions are blocked, adapting a mined rule")
+        mined_neg_rule = list(filter(lambda r: r[0].mined == True, neg_rules_triggered))[0][0]
+        print(mined_neg_rule)
+        print(feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1]))
+        state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
+        rules_snapshot = adapt_rules_based_on_state(mined_neg_rule,state_features, shield, rule_chooser, cfg)
+    sys.exit()
 
 
+def adapt_rules_based_on_state(mined_rule,state_features, shield, rule_chooser, cfg):
+    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+    if only_enumerable_features_difference(mined_rule, cfg.rules.features_with_enumerable_values, categorical_features, state_features, shield):
+        rules_snapshot = add_differing_enumerable_features(mined_rule, state_features, categorical_features, cfg.rules.features_with_enumerable_values, cfg.env.level, shield, rule_chooser, cfg.rules.exclude_features_in_neg_rules)
+        return rules_snapshot
+    elif mined_rule.polarity == False:
+        rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
+        return rules_snapshot
+    elif mined_rule.polarity == True:
+        rules_snapshot = add_neg_rule(features_dict_to_array(state_features), mined_rule.rule_head.action, shield, rule_chooser, cfg.rules.exclude_features_in_neg_rules)
+        rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
+        return rules_snapshot
 
+    # TODO does this make sense?
+
+def only_enumerable_features_difference(rule, enumerable_features, categorical_features, state_features, shield):
+    features_values = shield.discretize(features_dict_to_array(state_features)).astype(int)
+    feature_facts = {
+        fi: value
+        for fi, value in zip(shield.feature_indices, features_values)
+    }
+    print("conditions: ", rule.rule_body.conditions)
+    print("feature facts keys: ", list(feature_facts.keys()))
+    occurring_features = [f.feature for f in rule.rule_body.conditions]
+    print("occurring features in rule: ", occurring_features)
+    differing_features = [f for f in list(feature_facts.keys()) if f not in occurring_features]
+    print("feature facts:", feature_facts)
+    print("differing features: ")
+    for f in differing_features:
+        print(f"feature {f.feature} : rule value {f.valuation}")
+
+    for f in differing_features:
+        if not f.feature in categorical_features and f.feature not in enumerable_features:
+            return False
+    return True
+
+
+def add_differing_enumerable_features(mined_rule,state_features, categorical_features, enumerable_features, level, shield, rule_chooser, exclude_features_in_neg_rules):
+    feature_facts = {
+        fi: value
+        for fi, value in zip(shield.feature_indices, features_dict_to_array(state_features))
+    }
+    adapted_rule = copy.deepcopy(mined_rule)
+    feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
+    adapted_rules = [adapted_rule]
+    for fi in feature_facts.keys():
+        if fi in exclude_features_in_neg_rules or fi in feature_indices_in_rule:
+            continue
+        if fi in categorical_features:
+            for i,r in enumerate(adapted_rules):
+                adapted_rules[i] = r.add_feature(fi, abs(feature_facts[fi]-1))
+        elif fi in enumerable_features:
+            for v in range(0, number_of_ghosts(level)+1):
+                if v != feature_facts[fi]:
+                    for i,r in enumerate(adapted_rules):
+                        #TODO fix?
+                        adapted_rules.append(r.add_feature(fi, v))
+                        adapted_rules.pop(i)
+
+
+    log.info(f"State features used to adapt the rule:{feature_facts}")
+    log.info(f"Original rule: {str(mined_rule)}")
+    log.info(f"Adapted rules: {[str(r) for r in adapted_rules]}")
+    rules_snapshot = add_rule(adapted_rule, shield, rule_chooser)
+    return rules_snapshot
+       
 
 
 def update(state, obs_rules, rule_chooser, shield, action, triggered_rules, env_info, feature_extractor_name, feature_extractor, exclude_features):
     if triggered_rules != None:
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(env_info.name, env_info.level, feature_extractor_name)
         (pos_rules_triggered, neg_rules_triggered) = triggered_rules
-        for rule in neg_rules_triggered + pos_rules_triggered:
-            if has_rule_only_categorical_features(rule[0], categorical_features):
-                state_features = feature_extractor.getFeatures(state,action)
-                rule[0] = update_categorical(rule[0], state_features)
+        # TODO for rule in neg_rules_triggered + pos_rules_triggered:
+            # if has_rule_only_categorical_features(rule[0], categorical_features):
+            #     state_features = feature_extractor.getFeatures(state,action)
+            #     rule[0] = update_categorical(rule[0], state_features)
     return add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features)
 
+
+def remove_rule(rule, shield, rule_chooser):
+    if rule.polarity == False:
+        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
+        rule_chooser_rules_copy.pop()
+        cancelable_rules_copy = shield.cancelable_rules.copy()
+        cancelable_rules_copy.pop(str(rule))
+        new_sorted = sorted(cancelable_rules_copy.keys())
+
+        shield.remove_neg_rule(str(rule))
+        shield.cancelable_rules.pop(str(rule))
+        rule_chooser.set_rules_list(rule_chooser_rules_copy)
+        rule_chooser.sorted_cancel_rules = new_sorted
+
+        log.info(f"Removed rule: {rule}")
+
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = cancelable_rules_copy,
+        )
+        return rules_snapshot
+    
+    else:
+        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
+        rule_chooser_rules_copy.remove(-1)
+        enforcable_rules_copy = shield.enforceable_rules.copy()
+        enforcable_rules_copy.pop(str(rule))
+        new_sorted = sorted(enforcable_rules_copy.keys())
+
+        shield.remove_pos_rule(str(rule))
+        shield.enforceable_rules.pop(str(rule))
+        rule_chooser.set_rules_list(rule_chooser_rules_copy)
+        rule_chooser.sorted_enforceable_rules = new_sorted
+
+        log.info(f"Removed rule: {rule}")
+
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = cancelable_rules_copy,
+        )
+        return rules_snapshot
+
+
+def add_rule(rule, shield, rule_chooser, rule_str = None):
+    if rule_str is not None:
+        rule = string_to_rule(rule_str, False)
+    if rule.polarity == False:
+        cancelable_rule = dict()
+        cancelable_rule[str(rule)] = [rule]
+
+        cancelable_rules_copy = shield.cancelable_rules.copy()
+        cancelable_rules_copy.update(cancelable_rule)
+
+        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
+        rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
+
+        new_sorted = sorted(cancelable_rules_copy.keys())
+
+        shield.add_neg_rule(str(rule))
+        shield.cancelable_rules = cancelable_rules_copy
+        rule_chooser.set_rules_list(rule_chooser_rules_copy)
+        rule_chooser.sorted_cancel_rules = new_sorted
+
+        log.info(f"Added rule: {rule}")
+
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = cancelable_rules_copy,
+        )
+        return rules_snapshot
+    
+    else:
+        enforcable_rule = dict()
+        enforcable_rule[str(rule)] = [rule]
+
+        enforcable_rules_copy = shield.enforceable_rules.copy()
+        enforcable_rules_copy.update(enforcable_rule)
+
+        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
+        rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
+
+        new_sorted = sorted(enforcable_rules_copy.keys())
+
+        shield.add_pos_rule(str(rule))
+        shield.enforceable_rules = enforcable_rules_copy
+        rule_chooser.set_rules_list(rule_chooser_rules_copy)
+        rule_chooser.sorted_enforceable_rules = new_sorted
+
+        log.info(f"Added rule: {rule}")
+
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = cancelable_rules_copy,
+        )
+        return rules_snapshot
 
 
 def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
@@ -228,54 +375,7 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     for f in relevant_facts:
         neg_rule += f"{f},"
     neg_rule = neg_rule[:-1] + "."
-    log.info(f"Added rule: {neg_rule}")
-    cancelable_rule = dict()
-    cancelable_rule[neg_rule] = [string_to_rule(neg_rule, False)]
-
-    cancelable_rules_copy = shield.cancelable_rules.copy()
-    cancelable_rules_copy.update(cancelable_rule)
-
-    rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-    rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
-
-    new_sorted = sorted(cancelable_rules_copy.keys())
-
-    shield.add_neg_rule(neg_rule)
-    shield.cancelable_rules = cancelable_rules_copy
-    rule_chooser.set_rules_list(rule_chooser_rules_copy)
-    rule_chooser.sorted_cancel_rules = new_sorted
-
-    rules_snapshot = RuleSnapshot(
-        enforceable_rules = shield.enforceable_rules,
-        cancelable_rules = cancelable_rules_copy,
-    )
-    return rules_snapshot
-        
-
-# def adapt_pos_rule(state_features, rule, shield, rule_chooser, exclude_features):
-#     state_features = [f"f{i}({int(value)})" for i, (key, value) in enumerate(state_features.items()) if i not in exclude_features]
-#     features_values_rule = rule.strip(".-").split("action(")[1][6:].split(",")
-    
-#     cancelable_rule = dict()
-#     cancelable_rule[neg_rule] = [string_to_rule(neg_rule, False)]
-#     shield.cancelable_rules.update(turn_rules_to_str(cancelable_rule))
-#     rule_chooser.rules_list.append(len(rule_chooser.rules_list))
-#     rule_chooser.sorted_cancel_rules = sorted(shield.cancelable_rules.keys())
-
-def update_categorical(rule, state_features):
-    # features_values_rule = rule.strip(".-").split("action(")[1][6:].split(",")
-    # state_features = [f"f{i}({int(value) if isinstance(value, bool) else value})" for i, (key, value) in enumerate(state_features.items())]
-    # TODO
-    return
-
-
-# TODO check state instead?
-def has_rule_only_categorical_features(rule, categorical_features):
-    rule_features = rule.rule_body.conditions #strip(".-").split("action(")[1][6:].split(",")
-    for f in rule_features:
-        if not f.feature in categorical_features:
-            return False
-    return True
+    return add_rule(None, shield, rule_chooser, rule_str=neg_rule)     
 
 
 
@@ -283,20 +383,23 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
     action, _states = model.predict(obs)
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
 
+    # print("triggered rules:")
     # if triggered_rules != None:
     #     (pos, neg) = triggered_rules
     #     for r in neg + pos:
     #         print(r[0])
-
+    
+    #print("orig. action :", action)
     if triggers:
         (pos_actions_triggered, neg_actions_triggered) = triggered_actions
-        #TODO change to enforce favoring
         changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
                                         triggered_rules, change_type="favor_enforce")
         if changed_action is not None:
             if len(activated_created_rules) > 0:
                 log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
             action = changed_action
+    #print("changed action :", action, "\n")
+
     return action, triggered_rules
 
 
