@@ -131,6 +131,25 @@ class AspShield(Shield):
         self.neg_rules_list.append(rule_str)
         self.nr_rules += 1
 
+    def remove_neg_rule(self, rule_str):
+        neg_rules_list = self.all_neg_rules.split("\n")
+        neg_rules_list.remove(rule_str)
+        self.all_neg_rules = "\n".join(neg_rules_list)
+        self.neg_rules_list.remove(rule_str)
+        self.nr_rules -= 1
+
+    def add_pos_rule(self, rule_str):
+        self.all_pos_rules += f"\n{rule_str}"
+        self.pos_rules_list.append(rule_str)
+        self.nr_rules += 1
+
+    def remove_pos_rule(self, rule_str):
+        pos_rules_list = self.all_pos_rules.split("\n")
+        pos_rules_list.remove(rule_str)
+        self.all_pos_rules = "\n".join(pos_rules_list)
+        self.pos_rules_list.remove(rule_str)
+        self.nr_rules -= 1
+
     def get_trigger_action(self, rules, facts, original_rules):
         if len(rules) == 0:
             return [], []
