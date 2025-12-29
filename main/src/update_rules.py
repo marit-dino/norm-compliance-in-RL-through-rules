@@ -5,17 +5,14 @@ from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, change_action
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
-from legible.shield.create_rules_common import turn_rules_to_str
-from legible.rule_learning.util import load_model
+from legible.rule_learning.util import load_model, save_pickle
 from legible.feature_and_rule_learn import get_features_and_failure_indication
 from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor, features_dict_to_array
-from oftendeeprl.env_util import PacmanClingoHelper, get_gym_to_action_names
 from pacman_helper_asp import PacmanViolationClingoHelper
 import sys, logging, torch
 import check_norms
 from os import listdir
 from os.path import isfile, join
-import numpy as np
 import copy
 from collections import deque 
 
@@ -62,6 +59,17 @@ def setup_update(cfg : DictConfig) -> None:
 
     update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
     update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
+
+    shield_name = f"pickles/shields/uncorr/"\
+                  f"norm_guided_dqn_{cfg.env.name.replace('/','_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_"\
+                  f"{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
+
+    if cfg.rules.shield_number is None:
+        save_pickle(shield_name,shield)
+    else:
+        shield_name = f"{shield_name}_updated_{cfg.rules.shield_number}.pkl"
+        save_pickle(shield_name,shield,exact_match=True)
+
 
 
 
@@ -163,14 +171,12 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
     neg_actions = [r[0].rule_head.action for r in neg_rules_triggered]
-    print(neg_actions)
     blocked_actions = set(neg_actions)
     actions_blocked_by_created_rules = {a: True for a in blocked_actions}
 
     for r in neg_rules_triggered:
         if r[0].mined == True:
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
-        print(r[0])
 
     if False not in list(actions_blocked_by_created_rules.values()):
         log.info(f"Backtracking, all actions are blocked by created rules")
@@ -181,16 +187,13 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = list(filter(lambda r: r[0].mined == True, neg_rules_triggered))[0][0]
-        print(mined_neg_rule)
-        print(feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1]))
         state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
         rules_snapshot = adapt_rules_based_on_state(mined_neg_rule,state_features, shield, rule_chooser, cfg)
-    sys.exit()
 
 
 def adapt_rules_based_on_state(mined_rule,state_features, shield, rule_chooser, cfg):
     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
-    if only_enumerable_features_difference(mined_rule, cfg.rules.features_with_enumerable_values, categorical_features, state_features, shield):
+    if only_enumerable_features_difference(mined_rule, cfg.rules.features_with_enumerable_values, categorical_features, state_features, cfg.rules.exclude_features_in_neg_rules, shield):
         rules_snapshot = add_differing_enumerable_features(mined_rule, state_features, categorical_features, cfg.rules.features_with_enumerable_values, cfg.env.level, shield, rule_chooser, cfg.rules.exclude_features_in_neg_rules)
         return rules_snapshot
     elif mined_rule.polarity == False:
@@ -203,22 +206,22 @@ def adapt_rules_based_on_state(mined_rule,state_features, shield, rule_chooser, 
 
     # TODO does this make sense?
 
-def only_enumerable_features_difference(rule, enumerable_features, categorical_features, state_features, shield):
+def only_enumerable_features_difference(rule, enumerable_features, categorical_features, state_features, exclude_features, shield):
     features_values = shield.discretize(features_dict_to_array(state_features)).astype(int)
     feature_facts = {
         fi: value
         for fi, value in zip(shield.feature_indices, features_values)
+        if fi not in exclude_features
     }
-    print("conditions: ", rule.rule_body.conditions)
-    print("feature facts keys: ", list(feature_facts.keys()))
     occurring_features = [f.feature for f in rule.rule_body.conditions]
-    print("occurring features in rule: ", occurring_features)
     differing_features = [f for f in list(feature_facts.keys()) if f not in occurring_features]
     print("differing features: ", differing_features)
     
     for f in differing_features:
-        if not (f in categorical_features and f not in enumerable_features):
+        if f not in categorical_features and f not in enumerable_features:
+            print("NON enumerable feature detected: ", f)
             return False
+    print("only enumerable feature differences")
     return True
 
 
@@ -269,12 +272,11 @@ def remove_rule(rule, shield, rule_chooser):
         rule_chooser_rules_copy = rule_chooser.rules_list.copy()
         rule_chooser_rules_copy.pop()
         cancelable_rules_copy = shield.cancelable_rules.copy()
-        print(cancelable_rules_copy)
-        cancelable_rules_copy.pop(str(rule))
+        cancelable_rules_copy = {k: v for k,v in cancelable_rules_copy.items() if string_to_rule(k) != rule}
         new_sorted = sorted(cancelable_rules_copy.keys())
 
         shield.remove_neg_rule(str(rule))
-        shield.cancelable_rules.pop(str(rule))
+        shield.cancelable_rules = cancelable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_cancel_rules = new_sorted
 
@@ -290,11 +292,11 @@ def remove_rule(rule, shield, rule_chooser):
         rule_chooser_rules_copy = rule_chooser.rules_list.copy()
         rule_chooser_rules_copy.remove(-1)
         enforcable_rules_copy = shield.enforceable_rules.copy()
-        enforcable_rules_copy.pop(str(rule))
+        enforcable_rules_copy = {k: v for k,v in enforcable_rules_copy.items() if string_to_rule(k) != rule}
         new_sorted = sorted(enforcable_rules_copy.keys())
 
         shield.remove_pos_rule(str(rule))
-        shield.enforceable_rules.pop(str(rule))
+        shield.enforceable_rules = enforcable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_enforceable_rules = new_sorted
 
@@ -322,7 +324,7 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
 
         new_sorted = sorted(cancelable_rules_copy.keys())
 
-        shield.add_neg_rule(str(rule))
+        shield.add_neg_rule(rule)
         shield.cancelable_rules = cancelable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_cancel_rules = new_sorted
@@ -347,7 +349,7 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
 
         new_sorted = sorted(enforcable_rules_copy.keys())
 
-        shield.add_pos_rule(str(rule))
+        shield.add_pos_rule(rule)
         shield.enforceable_rules = enforcable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_enforceable_rules = new_sorted

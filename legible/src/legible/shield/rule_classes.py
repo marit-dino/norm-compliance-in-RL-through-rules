@@ -34,7 +34,7 @@ class RuleBody:
         return hash(self.conditions)
 
     def __str__(self):
-        return ",".join(map(str,self.conditions))
+        return ", ".join(map(str,self.conditions))
 
 
 class RuleHead:

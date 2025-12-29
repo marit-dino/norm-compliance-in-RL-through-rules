@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import clingo
 
 from rule_learning.learnRules import replace_single_cont_value
+from shield.rule_classes import string_to_rule
 
 def getModels(generation, rules, constraint, obs):
     """
@@ -126,28 +127,31 @@ class AspShield(Shield):
         self.nr_rules = len(self.pos_rules_list) + len(self.neg_rules_list)
 
 
-    def add_neg_rule(self, rule_str):
-        self.all_neg_rules += f"\n{rule_str}"
-        self.neg_rules_list.append(rule_str)
-        self.nr_rules += 1
+    def add_neg_rule(self, rule):
+        self.all_neg_rules += f"\n{str(rule)}"
+        self.neg_rules_list.append(str(rule))
+        self.nr_rules += 1  
 
     def remove_neg_rule(self, rule_str):
-        neg_rules_list = self.all_neg_rules.split("\n")
-        neg_rules_list.remove(rule_str)
-        self.all_neg_rules = "\n".join(neg_rules_list)
-        self.neg_rules_list.remove(rule_str)
+        neg_rules_list_copy = self.neg_rules_list.copy()
+        #TODO if works also for pos
+        neg_rules_list_copy = [r for r in neg_rules_list_copy if rule_str != str(string_to_rule(r))]
+        self.all_neg_rules = "\n".join(neg_rules_list_copy)
+        self.neg_rules_list = neg_rules_list_copy
         self.nr_rules -= 1
 
-    def add_pos_rule(self, rule_str):
-        self.all_pos_rules += f"\n{rule_str}"
-        self.pos_rules_list.append(rule_str)
+    def add_pos_rule(self, rule):
+        self.all_pos_rules += f"\n{str(rule_str)}"
+        self.pos_rules_list.append(str(rule_str))
+        #TODO check if that results in the correct order of features in the body
         self.nr_rules += 1
 
     def remove_pos_rule(self, rule_str):
-        pos_rules_list = self.all_pos_rules.split("\n")
-        pos_rules_list.remove(rule_str)
-        self.all_pos_rules = "\n".join(pos_rules_list)
-        self.pos_rules_list.remove(rule_str)
+        pos_rules_list_copy = self.pos_rules_list.copy()
+        #TODO if works also for pos
+        pos_rules_list_copy = [r for r in pos_rules_list_copy if rule_str != str(string_to_rule(r))]
+        self.all_pos_rules = "\n".join(pos_rules_list_copy)
+        self.pos_rules_list = pos_rules_list_copy
         self.nr_rules -= 1
 
     def get_trigger_action(self, rules, facts, original_rules):

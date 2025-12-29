@@ -6,8 +6,11 @@ Open tasks:
 - [ ] adapt feature extractors (think about which features i want)
 - [x] mine rules
 - [ ] update process
-    - [ ] update method for rules to exlude specific states
+    - [x] update method for rules to exlude specific states
     - [x] check whether less violations are possible in asp
+    - [ ] what to do if backtracking exceeds horizon? (should this even happen?)
+    - [ ] fix "looping" in same violation for a few steps that happens from time to time
+    - [ ] store updated rule set
 - [ ] documentation/comments
 - [ ] add more complex norms
 - [ ] evaluation
@@ -20,5 +23,5 @@ Open tasks:
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
 - [x] check how intervals affect mined rules
-- [ ] what to do if backtracking exceeds horizon? (should this even happen?)
+
 
