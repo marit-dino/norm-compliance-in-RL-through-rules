@@ -10,7 +10,8 @@ Open tasks:
     - [x] check whether less violations are possible in asp
     - [ ] what to do if backtracking exceeds horizon? (should this even happen?)
     - [ ] fix "looping" in same violation for a few steps that happens from time to time
-    - [ ] store updated rule set
+    - [x] store updated rule set
+    - [ ] everything can be enumerated because of the intervals -> adapt rule update process
 - [ ] documentation/comments
 - [ ] add more complex norms
 - [ ] evaluation

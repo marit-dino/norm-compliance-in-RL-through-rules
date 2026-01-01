@@ -175,7 +175,7 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,rule_string = '',shield =
 
 
 def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
-                 exact_model_number = None, algo_name = "dqn", steps_norm=0):
+                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False):
     if improved:
         shield_type = "improved"
     else:
@@ -189,7 +189,7 @@ def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
                     f"{algo_name}_{env_name.replace('/', '_')}_{mode}_feat_{shield_feat}_{steps_initial}_shield"
     else:
         shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}_{env_name.replace('/', '_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield"
+                    f"{algo_name}_{env_name.replace('/', '_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
     
     if exact_model_number is None:
         shield = load_pickle(shield_name)
