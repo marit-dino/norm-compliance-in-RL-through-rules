@@ -1,25 +1,22 @@
 import hydra
 from omegaconf import DictConfig
-from util import RuleSnapshot
+from util import RuleSnapshot, get_model_number, get_shield_number, get_feature_extractor, set_rules, save_rule_set
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, change_action
-from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
-from legible.rule_learning.util import load_model, save_pickle
+from legible.rule_learning.util import load_model
 from legible.feature_and_rule_learn import get_features_and_failure_indication
-from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor, features_dict_to_array
+from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from pacman_helper_asp import PacmanViolationClingoHelper
 import sys, logging, torch
 import check_norms
-from os import listdir
-from os.path import isfile, join
 import copy
 from collections import deque 
 
 log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
-def setup_update(cfg : DictConfig) -> None:
+def setup(cfg : DictConfig) -> None:
     norm_descriptor = f"{'_'.join(cfg.norms)}"
     config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
@@ -31,7 +28,7 @@ def setup_update(cfg : DictConfig) -> None:
     num_actions = env.action_space.n
     action_tensor = torch.tensor(range(num_actions), device=device)
 
-    model_number = get_model_number(cfg, config_str)
+    model_number = get_model_number(cfg)
     model = load_model(model_path + f"_{model_number}","norm_guided_dqn",env=env,exact_match=True)
     shield_number = get_shield_number(cfg)
 
@@ -57,26 +54,11 @@ def setup_update(cfg : DictConfig) -> None:
     assert hasattr(shield, 'enforceable_rules')
     assert hasattr(shield, 'cancelable_rules')
 
-    update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
-    update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
-
-    shield_name = f"pickles/shields/uncorr/"\
-                  f"norm_guided_dqn_{cfg.env.name.replace('/','_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_"\
-                  f"{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
-
-    if cfg.rules.shield_number is None:
-        save_pickle(shield_name,shield)
-    else:
-        shield_name = f"{shield_name}_updated_{cfg.rules.shield_number}.pkl"
-        save_pickle(shield_name,shield,exact_match=True)
+    return env, model, action_tensor, shield, rule_chooser, cfg
 
 
-
-
-
-
-# adapted from legible
-def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def update_rule_set(env, model, action_tensor, shield, rule_chooser):
     # TODO move a part of this to  a setup method
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon+1)
@@ -113,7 +95,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
         
         if len(shield.get_blocked_actions(obs_rules)) == 4:
-            all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
+            rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
                     
         action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
         last_n_triggered_rules.append(triggered_rules)
@@ -130,6 +112,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         if last_n_violations[-1] > 0:
             less_violations_possible = []
             last_n_states_copy = last_n_states.copy()
+            log.info(str(rules_snapshot))
             for j, state in enumerate(last_n_states):
                 log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
                 if j < cfg.asp.horizon:
@@ -184,11 +167,13 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
         # TODO what if we backtrack more than the deque is long? (can this even happen?)
         update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
         print(f"Now in \n {env.unwrapped.game.state}")
+        return rules_snapshot
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = list(filter(lambda r: r[0].mined == True, neg_rules_triggered))[0][0]
         state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
         rules_snapshot = adapt_rules_based_on_state(mined_neg_rule,state_features, shield, rule_chooser, cfg)
+        return rules_snapshot
 
 
 def adapt_rules_based_on_state(mined_rule,state_features, shield, rule_chooser, cfg):
@@ -403,65 +388,15 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
     return action, triggered_rules
 
 
-# adapted from legible
-def set_rules(shield):
-    enforceable_rules = dict()
-    cancelable_rules = dict()
-    for pos_rule in shield.pos_rules_list:
-        if len(pos_rule.strip()) == 0:
-            continue
-        enforceable_rules[pos_rule] = [string_to_rule(pos_rule, True)]
-    for neg_rule in shield.neg_rules_list:
-        if len(neg_rule.strip()) == 0:
-            continue
-        cancelable_rules[neg_rule] = [string_to_rule(neg_rule, True)]
-    shield.enforceable_rules = enforceable_rules
-    shield.cancelable_rules = cancelable_rules
-    rule_chooser = RuleChooser(shield)
-    rule_chooser.set_rules_list(list(range(0,len(list(enforceable_rules.keys()) + list(cancelable_rules.keys())))))
-    return shield, rule_chooser
-    
-
 def number_of_ghosts(level):
     if level.startswith("small"):
         return 2
     else:
         return 4
 
-def get_model_number(cfg, norm_descriptor):
-    if cfg.rules.model_number is None:
-        model_name = f"norm_guided_dqn__{norm_descriptor}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.env.level}_{cfg.training.feature_extractor}"
-        norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
-                            and f.startswith(model_name)]
-        if len(norm_guided_models) == 0:
-            sys.exit("No policy found that matches the provided parameters.")
-        return sorted(norm_guided_models)[-1].removesuffix(".zip").rsplit("_", 1)[-1]
-    else: 
-       return cfg.rules.model_number
-    
-def get_shield_number(cfg):
-    if cfg.rules.shield_number is None:
-        shield_name = f"norm_guided_dqn_{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
-        shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name)]
-        if len(shields) == 0:
-            sys.exit("No shield found that matches the provided parameters.")
-        return sorted(shields)[-1].removesuffix(".pkl").rsplit("_", 1)[-1]
-    else: 
-       return cfg.rules.shield_number
-    
 
-def get_feature_extractor(feature_extractor, height, width):
-    if feature_extractor == "extended-6":
-        return ExtendedExtractor6(height=height,width=width)
-    elif feature_extractor == "extended-7":
-        return ExtendedExtractor7(height=height,width=width)
-    elif feature_extractor == "extended-8":
-        return ExtendedExtractor8(height=height,width=width)
-    elif feature_extractor == "extended-9":
-        return ExtendedExtractor9(height=height,width=width)
-    elif feature_extractor == "complete" :
-        return DeepRLCompleteExtractor(height=height, width=width)
-    
 
 if __name__ == "__main__":
-    setup_update()
+    env, model, action_tensor, shield, rule_chooser, cfg = setup()
+    update_rule_set(env, model, action_tensor, shield, rule_chooser)
+    save_rule_set(shield, cfg)
