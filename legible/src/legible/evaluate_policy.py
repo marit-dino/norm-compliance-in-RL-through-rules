@@ -12,6 +12,8 @@ from torch.distributions import Categorical
 from rule_learning.util import load_pickle, load_model, save_pickle
 from env_util import create_environment_and_modelname
 from shield.shields import AspShield, RuleChooser, RandomShield
+from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
+from util import RuleSnapshot
 
 
 
@@ -100,7 +102,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
                 for rule_action in neg_triggered:
                     act_logits[rule_action] = -1e6
             corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action in neg_triggered, neg_triggered_created_rules))
-            return torch.argmax(act_logits).cpu().numpy(), corresponding_triggered_rules
+            return torch.argmax(act_logits).item(), corresponding_triggered_rules
     else:
         raise Exception("Unsupported")
 
@@ -115,6 +117,10 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
     use_rule = shield is not None
     action_changes = 0
     last_action = None
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
     while True:
         if algo_name == "ppo":
             action, _states = model.predict(obs)
@@ -128,14 +134,16 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
             raise Exception("Unsupported")
         if use_rule:
             obs_flat = obs.flatten()
-            triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
-            if triggers:
-                (pos_triggered, neg_triggered) = triggered
-                changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
-                                               last_action,change_type=change_type)
-                if changed_action is not None:
-                    action_changes += 1
-                    action = changed_action
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
+            #print(env.unwrapped.game.state)
+            # triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
+            # if triggers:
+            #     (pos_triggered, neg_triggered) = triggered
+            #     changed_action, _ = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+            #                                    triggered_rules,change_type=change_type)
+            #     if changed_action is not None:
+            #         action_changes += 1
+            #         action = changed_action
 
         obs, reward, term, trunc, info = env.step(action)
 
@@ -152,16 +160,17 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
     return win, rewards, action_changes
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,rule_string = '',shield = None,rule_chooser = None, change_type = None):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
 
-    print(f"Evaluation: {rule_string}" )
+    if rule_string != '':
+        print(f"Evaluation: {rule_string}" )
     all_rews = []
     wins = []
     for i in range(nr_eps):
-        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,'extended-8', shield,rule_chooser,change_type)
+        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor, shield,rule_chooser,change_type)
         wins.append(win)
         all_rews.append(rewards)
         action_changes_list.append(action_changes)

@@ -8,8 +8,7 @@ import sys, logging, torch
 
 log = logging.getLogger(__name__)
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def setup(cfg : DictConfig) -> None:
+def setup(cfg):
     norm_descriptor = f"{'_'.join(cfg.norms)}"
     config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
@@ -21,7 +20,7 @@ def setup(cfg : DictConfig) -> None:
     num_actions = env.action_space.n
     action_tensor = torch.tensor(range(num_actions), device=device)
 
-    model_number = get_model_number(cfg, config_str)
+    model_number = get_model_number(cfg)
     model = load_model(model_path + f"_{model_number}","norm_guided_dqn",env=env,exact_match=True)
     shield_number = get_shield_number(cfg)
 
@@ -39,36 +38,38 @@ def setup(cfg : DictConfig) -> None:
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
                            steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
     
-    shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True)
+    #shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    #                       steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True)
 
     if shield_initial is None:
         sys.exit("Could not load initial shield, check if it exists.")
-    if shield_updated is None:
-        sys.exit("Could not load updated shield, check if it exists.")
+    # if shield_updated is None:
+    #     sys.exit("Could not load updated shield, check if it exists.")
 
     shield_initial.feature_indices = ordered_feature_indices
-    shield_updated.feature_indices = ordered_feature_indices
+    #shield_updated.feature_indices = ordered_feature_indices
     shield_initial, rule_chooser_initial = set_rules(shield_initial)
-    shield_updated, rule_chooser_updated = set_rules(shield_updated)
+    #shield_updated, rule_chooser_updated = set_rules(shield_updated)
 
     assert hasattr(shield_initial, 'enforceable_rules')
     assert hasattr(shield_initial, 'cancelable_rules')
-    assert hasattr(shield_updated, 'enforceable_rules')
-    assert hasattr(shield_updated, 'cancelable_rules')
+    # assert hasattr(shield_updated, 'enforceable_rules')
+    # assert hasattr(shield_updated, 'cancelable_rules')
 
-    return env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated
+    return env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, None, None#, shield_updated, rule_chooser_updated
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def evaluate(env, model, model_name, rule_chooser, shield, action_tensor, cfg : DictConfig, updated=False):
-    stats = evaluate(env, model, rule_chooser, shield, action_tensor)
+def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, cfg, updated=False):
+    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce")
     stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}"
     save_pickle(stats_path, stats, exact_match=True)
 
-
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg : DictConfig) -> None:
+    env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated = setup(cfg)
+    evaluate_rules(env, model, model_name, rule_chooser_initial, shield_initial, action_tensor, cfg)
+    #evaluate_rules(env, model, model_name, rule_chooser_updated, shield_updated, action_tensor, cfg, True)
 
 if __name__ == "__main__":
-    env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated = setup()
-    evaluate(env, model, model_name, rule_chooser_initial, shield_initial, action_tensor)
-    evaluate(env, model, model_name, rule_chooser_updated, shield_updated, action_tensor)
+    main()

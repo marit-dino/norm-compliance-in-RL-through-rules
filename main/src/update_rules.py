@@ -15,8 +15,7 @@ from collections import deque
 
 log = logging.getLogger(__name__)
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def setup(cfg : DictConfig) -> None:
+def setup(cfg):
     norm_descriptor = f"{'_'.join(cfg.norms)}"
     config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
@@ -54,11 +53,10 @@ def setup(cfg : DictConfig) -> None:
     assert hasattr(shield, 'enforceable_rules')
     assert hasattr(shield, 'cancelable_rules')
 
-    return env, model, action_tensor, shield, rule_chooser, cfg
+    return env, model, action_tensor, shield, rule_chooser
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def update_rule_set(env, model, action_tensor, shield, rule_chooser):
+def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     # TODO move a part of this to  a setup method
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon+1)
@@ -368,13 +366,17 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
     action, _states = model.predict(obs)
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
 
-    # print("triggered rules:")
     # if triggered_rules != None:
+    #     print("triggered rules:")
+
     #     (pos, neg) = triggered_rules
     #     for r in neg + pos:
     #         print(r[0])
+    #     print("orig. action :", action)
+    #     print(state)
+    #     print(obs_rules)
     
-    #print("orig. action :", action)
+    
     if triggers:
         (pos_actions_triggered, neg_actions_triggered) = triggered_actions
         changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
@@ -395,8 +397,12 @@ def number_of_ghosts(level):
         return 4
 
 
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg : DictConfig) -> None:
+    env, model, action_tensor, shield, rule_chooser = setup(cfg)
+    update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg)
+    save_rule_set(shield, cfg)
+
 
 if __name__ == "__main__":
-    env, model, action_tensor, shield, rule_chooser, cfg = setup()
-    update_rule_set(env, model, action_tensor, shield, rule_chooser)
-    save_rule_set(shield, cfg)
+    main()
