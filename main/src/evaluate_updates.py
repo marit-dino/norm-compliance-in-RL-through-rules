@@ -36,28 +36,27 @@ def setup(cfg):
 
     #TODO move to util?
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
     
-    #shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-    #                       steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True)
+    shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True)
 
     if shield_initial is None:
         sys.exit("Could not load initial shield, check if it exists.")
-    # if shield_updated is None:
-    #     sys.exit("Could not load updated shield, check if it exists.")
+    if shield_updated is None:
+        sys.exit("Could not load updated shield, check if it exists.")
 
     shield_initial.feature_indices = ordered_feature_indices
-    #shield_updated.feature_indices = ordered_feature_indices
+    shield_updated.feature_indices = ordered_feature_indices
     shield_initial, rule_chooser_initial = set_rules(shield_initial)
-    #shield_updated, rule_chooser_updated = set_rules(shield_updated)
+    shield_updated, rule_chooser_updated = set_rules(shield_updated)
 
     assert hasattr(shield_initial, 'enforceable_rules')
     assert hasattr(shield_initial, 'cancelable_rules')
-    # assert hasattr(shield_updated, 'enforceable_rules')
-    # assert hasattr(shield_updated, 'cancelable_rules')
+    assert hasattr(shield_updated, 'enforceable_rules')
+    assert hasattr(shield_updated, 'cancelable_rules')
 
-    return env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, None, None#, shield_updated, rule_chooser_updated
-
+    return env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated
 
 def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, cfg, updated=False):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
@@ -69,7 +68,7 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
 def main(cfg : DictConfig) -> None:
     env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated = setup(cfg)
     evaluate_rules(env, model, model_name, rule_chooser_initial, shield_initial, action_tensor, cfg)
-    #evaluate_rules(env, model, model_name, rule_chooser_updated, shield_updated, action_tensor, cfg, True)
+    evaluate_rules(env, model, model_name, rule_chooser_updated, shield_updated, action_tensor, cfg, True)
 
 if __name__ == "__main__":
     main()

@@ -181,7 +181,7 @@ class PacmanEnv(gymnasium.Env):
             # 'ghost_in_frame': [self.ghostInFrame],
             'step_counter': [[0]],
         }
-        return self.obs(self.game.state,None),self.initial_info
+        return self.features.obs_from_state(self.game.state, None),self.initial_info
 
 
     def step(self, action):
@@ -258,7 +258,7 @@ class PacmanEnv(gymnasium.Env):
                 'l': self.step_counter
             }]
         info['agent_eaten'] = self.game.state.data.agentEatenCnt
-        return self.obs(self.game.state,action), reward, terminated, truncated, info
+        return self.features.obs_from_state(self.game.state, action), reward, terminated, truncated, info
 
     def get_state(self):
         return self.game.state

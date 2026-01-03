@@ -179,7 +179,7 @@ class PacmanEnv(gymnasium.Env):
             'step_counter': [[0]],
         }
 
-        return self.obs(self.game.state,None),self.initial_info
+        return self.features.obs_from_state(self.game.state, None),self.initial_info
 
 
     def step(self, action):
@@ -255,7 +255,7 @@ class PacmanEnv(gymnasium.Env):
                 'r': self.cum_reward,
                 'l': self.step_counter
             }]
-        return self.obs(self.game.state,action), reward, terminated, truncated, info
+        return self.features.obs_from_state(self.game.state, action), reward, terminated, truncated, info
 
     def get_action_meanings(self):
         return [PACMAN_ACTIONS[i] for i in self._action_set]

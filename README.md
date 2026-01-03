@@ -12,6 +12,7 @@ Open tasks:
     - [ ] fix "looping" in same violation for a few steps that happens from time to time
     - [x] store updated rule set
     - [ ] everything can be enumerated because of the intervals -> adapt rule update process
+    - [ ] fix "no" violations anymore?
 - [ ] documentation/comments
 - [ ] add more complex norms
 - [ ] evaluation

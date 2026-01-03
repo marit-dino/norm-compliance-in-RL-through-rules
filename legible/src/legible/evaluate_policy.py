@@ -135,15 +135,14 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
         if use_rule:
             obs_flat = obs.flatten()
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
-            #print(env.unwrapped.game.state)
-            # triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
-            # if triggers:
-            #     (pos_triggered, neg_triggered) = triggered
-            #     changed_action, _ = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
-            #                                    triggered_rules,change_type=change_type)
-            #     if changed_action is not None:
-            #         action_changes += 1
-            #         action = changed_action
+            triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
+            if triggers:
+                (pos_triggered, neg_triggered) = triggered
+                changed_action, _ = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+                                               triggered_rules=triggered_rules, change_type=change_type)
+                if changed_action is not None:
+                    action_changes += 1
+                    action = changed_action
 
         obs, reward, term, trunc, info = env.step(action)
 
