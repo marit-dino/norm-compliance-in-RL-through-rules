@@ -42,7 +42,7 @@ def setup(cfg):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     features = feature_extractor.getFeatures(env.unwrapped.game.state,None)
     ordered_features = sorted(list(features.items()),key=lambda x: x[0])
-    #features = features_dict_to_array(features)
+
     feature_to_index = {
         name: idx for idx, name in enumerate(features)
     }
@@ -57,83 +57,82 @@ def setup(cfg):
 
 
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
-    # TODO move a part of this to  a setup method
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon+1)
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
     last_n_actions = deque(maxlen=cfg.asp.horizon+1)
     last_n_triggered_rules = deque(maxlen=cfg.asp.horizon+1)
     prev_env_states = deque(maxlen=cfg.asp.horizon+1)
+
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
     obs_t = obs_t.to(action_tensor.device)
     last_n_actions.append(None)
     last_n_violations.append(0)
-    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    # TODO determine vegetarian/norms
     last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
     prev_env_states.append(env.unwrapped.save_state())
-    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), vegetarian=True, num_norms=len(cfg.norms))
+
+    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norms, num_norms=len(cfg.norms))
 
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
         cancelable_rules = shield.cancelable_rules,
     )
 
-    # TODO until convergence etc. / based on number of episodes
-    for i in range(25000):
-        if i % 1000 == 0:
-            print(i)
-        total_violations += last_n_violations[-1]
-        action, _states = model.predict(obs)
-        q_values = policy.q_net(obs_t).squeeze()
-        act_logits = q_values        
-        obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
+    for i in range(cfg.rules.updates.episodes):
+        log.info(f"Episode {i+1}/{cfg.rules.updates.episodes}")
 
-        
-        if len(shield.get_blocked_actions(obs_rules)) == 4:
-            rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
-                    
-        action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
-        last_n_triggered_rules.append(triggered_rules)
-        
-        obs, reward, term, trunc, info = env.step(action)
-        last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
-        last_n_actions.append(action)
-        last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
-        prev_env_states.append(env.unwrapped.save_state())
+        while True:
+            total_violations += last_n_violations[-1]
+            action, _states = model.predict(obs)
+            q_values = policy.q_net(obs_t).squeeze()
+            act_logits = q_values        
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
 
-        obs_t, vectorized_env = policy.obs_to_tensor(obs)
-        obs_t = obs_t.to(action_tensor.device)
+            if len(shield.get_blocked_actions(obs_rules)) == 4:
+                rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
+                        
+            action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
+            last_n_triggered_rules.append(triggered_rules)
+            
+            obs, reward, term, trunc, info = env.step(action)
+            last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
+            last_n_actions.append(action)
+            last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
+            prev_env_states.append(env.unwrapped.save_state())
 
-        if last_n_violations[-1] > 0:
-            less_violations_possible = []
-            last_n_states_copy = last_n_states.copy()
-            log.info(str(rules_snapshot))
-            for j, state in enumerate(last_n_states):
-                log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
-                if j < cfg.asp.horizon:
-                    less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
-            print(less_violations_possible)
-            if True in less_violations_possible:
-                prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
-                rules_snapshot = update(last_n_states[-1], prev_obs, rule_chooser, shield, prev_action, prev_triggered_rules, cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
-                continue
-            else:
-                log.info("Nothing to update, the number of violations cannot be decreased reliably.")
-
-        if term and reward > 0:
-            win = True 
-        if term or trunc:
-            obs, info = env.reset()
             obs_t, vectorized_env = policy.obs_to_tensor(obs)
             obs_t = obs_t.to(action_tensor.device)
-            last_n_states = deque(maxlen=cfg.asp.horizon+1)
-            last_n_actions = deque(maxlen=cfg.asp.horizon+1)
-            last_n_actions.append(None)
-            last_n_states.append(env.unwrapped.game.state)
 
+            if last_n_violations[-1] > 0:
+                less_violations_possible = []
+                last_n_states_copy = last_n_states.copy()
+                for j, state in enumerate(last_n_states):
+                    log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
+                    if j < cfg.asp.horizon:
+                        less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
+                print(less_violations_possible)
+                if True in less_violations_possible:
+                    prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
+                    rules_snapshot = add_neg_rule(prev_obs, prev_action, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
+                    continue
+                else:
+                    log.info("Nothing to update, the number of violations cannot be decreased reliably.")
+
+            if term or trunc:
+                obs, info = env.reset()
+                obs_t, vectorized_env = policy.obs_to_tensor(obs)
+                obs_t = obs_t.to(action_tensor.device)
+                last_n_states = deque(maxlen=cfg.asp.horizon+1)
+                last_n_actions = deque(maxlen=cfg.asp.horizon+1)
+                last_n_violations = deque(maxlen=cfg.asp.horizon+1)
+                last_n_triggered_rules = deque(maxlen=cfg.asp.horizon+1)
+                last_n_actions.append(None)
+                last_n_violations.append(0)
+                last_n_states.append(env.unwrapped.game.state)
+                break
 
     log.info(f"Total Violations: {total_violations}")
 
@@ -162,93 +161,52 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
     if False not in list(actions_blocked_by_created_rules.values()):
         log.info(f"Backtracking, all actions are blocked by created rules")
         prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
-        # TODO what if we backtrack more than the deque is long? (can this even happen?)
-        update(last_n_states[-1], prev_obs, rule_chooser, shield, last_n_actions[-1], last_n_triggered_rules[-1], cfg.env, cfg.rules.feature_extractor, feature_extractor, cfg.rules.exclude_features_in_neg_rules)
+        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
         print(f"Now in \n {env.unwrapped.game.state}")
         return rules_snapshot
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
-        mined_neg_rule = list(filter(lambda r: r[0].mined == True, neg_rules_triggered))[0][0]
+        mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
         state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
-        rules_snapshot = adapt_rules_based_on_state(mined_neg_rule,state_features, shield, rule_chooser, cfg)
+        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+        rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
         return rules_snapshot
 
 
-def adapt_rules_based_on_state(mined_rule,state_features, shield, rule_chooser, cfg):
-    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
-    if only_enumerable_features_difference(mined_rule, cfg.rules.features_with_enumerable_values, categorical_features, state_features, cfg.rules.exclude_features_in_neg_rules, shield):
-        rules_snapshot = add_differing_enumerable_features(mined_rule, state_features, categorical_features, cfg.rules.features_with_enumerable_values, cfg.env.level, shield, rule_chooser, cfg.rules.exclude_features_in_neg_rules)
-        return rules_snapshot
-    elif mined_rule.polarity == False:
-        rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
-        return rules_snapshot
-    elif mined_rule.polarity == True:
-        rules_snapshot = add_neg_rule(features_dict_to_array(state_features), mined_rule.rule_head.action, shield, rule_chooser, cfg.rules.exclude_features_in_neg_rules)
-        rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
-        return rules_snapshot
+def add_differing_enumerable_features(mined_rule,state_features, categorical_features, shield, rule_chooser, exclude_features_in_neg_rules):
+    discretized_features = shield.discretize(features_dict_to_array(state_features)).astype(int)
 
-    # TODO does this make sense?
-
-def only_enumerable_features_difference(rule, enumerable_features, categorical_features, state_features, exclude_features, shield):
-    features_values = shield.discretize(features_dict_to_array(state_features)).astype(int)
     feature_facts = {
         fi: value
-        for fi, value in zip(shield.feature_indices, features_values)
-        if fi not in exclude_features
+        for fi, value in zip(shield.feature_indices,discretized_features)
     }
-    occurring_features = [f.feature for f in rule.rule_body.conditions]
-    differing_features = [f for f in list(feature_facts.keys()) if f not in occurring_features]
-    print("differing features: ", differing_features)
-    
-    for f in differing_features:
-        if f not in categorical_features and f not in enumerable_features:
-            print("NON enumerable feature detected: ", f)
-            return False
-    print("only enumerable feature differences")
-    return True
-
-
-def add_differing_enumerable_features(mined_rule,state_features, categorical_features, enumerable_features, level, shield, rule_chooser, exclude_features_in_neg_rules):
-    feature_facts = {
-        fi: value
-        for fi, value in zip(shield.feature_indices, features_dict_to_array(state_features))
-    }
-    adapted_rule = copy.deepcopy(mined_rule)
+    rule_copy = copy.deepcopy(mined_rule)
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
-    adapted_rules = [adapted_rule]
+    adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
         if fi in exclude_features_in_neg_rules or fi in feature_indices_in_rule:
             continue
         if fi in categorical_features:
             for i,r in enumerate(adapted_rules):
                 adapted_rules[i] = r.add_feature(fi, abs(feature_facts[fi]-1))
-        elif fi in enumerable_features:
-            for v in range(0, number_of_ghosts(level)+1):
-                if v != feature_facts[fi]:
+        else:
+            for index, (lower, upper) in enumerate(shield.feature_intervals[fi]):
+                if not (lower <= feature_facts[fi] <= upper):
+                    rules_copy = copy.deepcopy(adapted_rules)
                     for i,r in enumerate(adapted_rules):
                         #TODO fix?
-                        adapted_rules.append(r.add_feature(fi, v))
-                        adapted_rules.pop(i)
+                        rules_copy.append(r.add_feature(fi, index))
+                    adapted_rules = rules_copy
 
 
     log.info(f"State features used to adapt the rule:{feature_facts}")
     log.info(f"Original rule: {str(mined_rule)}")
     log.info(f"Adapted rules: {[str(r) for r in adapted_rules]}")
-    rules_snapshot = add_rule(adapted_rule, shield, rule_chooser)
+    rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
+    for r in adapted_rules:
+        rules_snapshot = add_rule(r, shield, rule_chooser)
     return rules_snapshot
        
-
-
-def update(state, obs_rules, rule_chooser, shield, action, triggered_rules, env_info, feature_extractor_name, feature_extractor, exclude_features):
-    if triggered_rules != None:
-        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(env_info.name, env_info.level, feature_extractor_name)
-        (pos_rules_triggered, neg_rules_triggered) = triggered_rules
-        # TODO for rule in neg_rules_triggered + pos_rules_triggered:
-            # if has_rule_only_categorical_features(rule[0], categorical_features):
-            #     state_features = feature_extractor.getFeatures(state,action)
-            #     rule[0] = update_categorical(rule[0], state_features)
-    return add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features)
-
 
 def remove_rule(rule, shield, rule_chooser):
     if rule.polarity == False:
@@ -366,17 +324,6 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
     action, _states = model.predict(obs)
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
 
-    # if triggered_rules != None:
-    #     print("triggered rules:")
-
-    #     (pos, neg) = triggered_rules
-    #     for r in neg + pos:
-    #         print(r[0])
-    #     print("orig. action :", action)
-    #     print(state)
-    #     print(obs_rules)
-    
-    
     if triggers:
         (pos_actions_triggered, neg_actions_triggered) = triggered_actions
         changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
@@ -385,8 +332,7 @@ def get_action(model, obs, obs_rules, shield, state, last_action, feature_extrac
             if len(activated_created_rules) > 0:
                 log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
             action = changed_action
-    #print("changed action :", action, "\n")
-
+            
     return action, triggered_rules
 
 

@@ -37,7 +37,7 @@ def get_model_number(cfg):
 def get_shield_number(cfg):
     if cfg.rules.shield_number is None:
         shield_name = f"norm_guided_dqn_{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
-        shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name)]
+        shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name) and not "updated" in f]
         if len(shields) == 0:
             sys.exit("No shield found that matches the provided parameters.")
         return sorted(shields)[-1].removesuffix(".pkl").rsplit("_", 1)[-1]

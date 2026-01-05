@@ -8,7 +8,7 @@ from oftendeeprl.sb3_ext.pacman_helper import PacmanClingoHelper
 
 class PacmanViolationClingoHelper(PacmanClingoHelper):
 
-    def __init__(self, horizon, radius, ghosts, vegetarian, num_norms):
+    def __init__(self, horizon, radius, ghosts, norms, num_norms):
         self.ctl = clingo.Control(
             ["-c", f"max_horizon={horizon+1}",
              "-c", f"radius={radius}",
@@ -20,7 +20,7 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = vegetarian
+        self.vegetarian = "vegetarian" in norms
 
 
     def set_clingo_externals(self, state, num_violations, dynamic_horizon):
