@@ -5,6 +5,7 @@ from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, evaluate
 from legible.rule_learning.util import load_model, save_pickle
 import sys, logging, torch
+import check_norms
 
 log = logging.getLogger(__name__)
 
@@ -60,15 +61,34 @@ def setup(cfg):
 
 def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, cfg, updated=False):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce")
+    
+    def count_violations(state):
+        return check_norms.num_violations_detected(cfg.norms, state)
+    
+    prev_level = log.level
+    logging.disable(logging.CRITICAL)
+    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations)
+    logging.disable(logging.NOTSET)
+
+    log.info(f"Nr. wins: {stats.nr_wins}")
+    log.info(f"Avg. reward: {stats.avg_rew} with SE {stats.stderr_rew}")
+    log.info(f"Avg. violations: {stats.avg_violations} with SE {stats.stderr_violations}")
+    log.info(f"Avg. steps: {stats.avg_steps} with SE {stats.stderr_steps}")
+    log.info(f"Avg. action changes: {stats.avg_action_changes} with SE {stats.stderr_action_changes}")
     stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}"
     save_pickle(stats_path, stats, exact_match=True)
+
+
+
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg : DictConfig) -> None:
     env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated = setup(cfg)
+    log.info("Original rules:")
     evaluate_rules(env, model, model_name, rule_chooser_initial, shield_initial, action_tensor, cfg)
+    log.info("Updated rules:")
     evaluate_rules(env, model, model_name, rule_chooser_updated, shield_updated, action_tensor, cfg, True)
+   
 
 if __name__ == "__main__":
     main()

@@ -33,10 +33,11 @@ def find_top_k_indices(base_model_name, top_string, return_rew = False):
 
 
 class EvalStats:
-    def __init__(self,all_rews,action_changes_list,wins):
+    def __init__(self,all_rews,action_changes_list,wins,all_violations):
         self.all_rews = all_rews
         self.action_changes = action_changes_list
         self.cum_rews = []
+        self.cum_violations = all_violations
         self.steps =[]
         nr_eps = len(self.all_rews)
         for rewards in all_rews:
@@ -45,9 +46,11 @@ class EvalStats:
             self.cum_rews.append(cum_rew)
             self.steps.append(nr_steps)
         self.avg_rew = statistics.mean(self.cum_rews)
+        self.avg_violations = statistics.mean(self.cum_violations)
         self.avg_steps = statistics.mean(self.steps)
         self.avg_action_changes = statistics.mean(action_changes_list)
         self.stderr_rew = statistics.stdev(self.cum_rews) / math.sqrt(nr_eps)
+        self.stderr_violations = statistics.stdev(self.cum_violations) / math.sqrt(nr_eps)
         self.stderr_steps = statistics.stdev(self.steps) / math.sqrt(nr_eps)
         self.stderr_action_changes = statistics.stdev(action_changes_list) / math.sqrt(nr_eps)
         self.wins = wins
@@ -107,7 +110,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shield : AspShield = None,rule_chooser = None,change_type=None):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -116,6 +119,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
     rewards = []
     use_rule = shield is not None
     action_changes = 0
+    total_violations = 0
     last_action = None
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -150,16 +154,20 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
         obs_t = obs_t.to(action_tensor.device)
         last_action = action
         rewards.append(reward)
+
+        if violation_check != None:
+            total_violations += violation_check(env.unwrapped.game.state)
+
         if term and reward > 0:
             win = True # TODO check if true for all environments
         if term or trunc:
             break
 
 
-    return win, rewards, action_changes
+    return win, rewards, action_changes, total_violations
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
@@ -168,17 +176,15 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
         print(f"Evaluation: {rule_string}" )
     all_rews = []
     wins = []
+    all_violations = []
     for i in range(nr_eps):
-        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor, shield,rule_chooser,change_type)
+        win,rewards,action_changes,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor, shield,rule_chooser,change_type,violation_check)
         wins.append(win)
         all_rews.append(rewards)
+        all_violations.append(violations)
         action_changes_list.append(action_changes)
 
-    eval_stats = EvalStats(all_rews,action_changes_list,wins)
-    print(f"Nr. wins: {eval_stats.nr_wins}")
-    print(f"Avg. reward: {eval_stats.avg_rew} with SE {eval_stats.stderr_rew}")
-    print(f"Avg. steps: {eval_stats.avg_steps} with SE {eval_stats.stderr_steps}")
-    print(f"Avg. action changes: {eval_stats.avg_action_changes} with SE {eval_stats.stderr_action_changes}")
+    eval_stats = EvalStats(all_rews,action_changes_list,wins,all_violations)
     return eval_stats
 
 
