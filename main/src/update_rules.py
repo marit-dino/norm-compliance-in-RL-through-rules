@@ -1,8 +1,9 @@
 import hydra
 from omegaconf import DictConfig
-from util import RuleSnapshot, get_model_number, get_shield_number, get_feature_extractor, set_rules, save_rule_set
+from util import get_model_number, get_shield_number, get_feature_extractor
+from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
-from legible.evaluate_policy import setup_shield, change_action
+from legible.evaluate_policy import setup_shield
 from legible.create_rules_pacman import string_to_rule
 from legible.rule_learning.util import load_model
 from legible.feature_and_rule_learn import get_features_and_failure_indication
@@ -94,7 +95,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             if len(shield.get_blocked_actions(obs_rules)) == 4:
                 rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
                         
-            action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1],last_n_actions[-1], feature_extractor, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
+            action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
             
             obs, reward, term, trunc, info = env.step(action)
@@ -133,6 +134,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 last_n_violations.append(0)
                 last_n_states.append(env.unwrapped.game.state)
                 break
+        
+        # collect_data()
+        # prune_rule_set()
+        # optimize_rule_set()
 
     log.info(f"Total Violations: {total_violations}")
 
@@ -181,6 +186,7 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
         for fi, value in zip(shield.feature_indices,discretized_features)
     }
     rule_copy = copy.deepcopy(mined_rule)
+    rule_copy.mined = False
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
@@ -194,7 +200,6 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
                 if not (lower <= feature_facts[fi] <= upper):
                     rules_copy = copy.deepcopy(adapted_rules)
                     for i,r in enumerate(adapted_rules):
-                        #TODO fix?
                         rules_copy.append(r.add_feature(fi, index))
                     adapted_rules = rules_copy
 
@@ -207,102 +212,6 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
         rules_snapshot = add_rule(r, shield, rule_chooser)
     return rules_snapshot
        
-
-def remove_rule(rule, shield, rule_chooser):
-    if rule.polarity == False:
-        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-        rule_chooser_rules_copy.pop()
-        cancelable_rules_copy = shield.cancelable_rules.copy()
-        cancelable_rules_copy = {k: v for k,v in cancelable_rules_copy.items() if string_to_rule(k) != rule}
-        new_sorted = sorted(cancelable_rules_copy.keys())
-
-        shield.remove_neg_rule(str(rule))
-        shield.cancelable_rules = cancelable_rules_copy
-        rule_chooser.set_rules_list(rule_chooser_rules_copy)
-        rule_chooser.sorted_cancel_rules = new_sorted
-
-        log.info(f"Removed rule: {rule}")
-
-        rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
-        )
-        return rules_snapshot
-    
-    else:
-        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-        rule_chooser_rules_copy.remove(-1)
-        enforcable_rules_copy = shield.enforceable_rules.copy()
-        enforcable_rules_copy = {k: v for k,v in enforcable_rules_copy.items() if string_to_rule(k) != rule}
-        new_sorted = sorted(enforcable_rules_copy.keys())
-
-        shield.remove_pos_rule(str(rule))
-        shield.enforceable_rules = enforcable_rules_copy
-        rule_chooser.set_rules_list(rule_chooser_rules_copy)
-        rule_chooser.sorted_enforceable_rules = new_sorted
-
-        log.info(f"Removed rule: {rule}")
-
-        rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
-        )
-        return rules_snapshot
-
-
-def add_rule(rule, shield, rule_chooser, rule_str = None):
-    if rule_str is not None:
-        rule = string_to_rule(rule_str, False)
-    if rule.polarity == False:
-        cancelable_rule = dict()
-        cancelable_rule[str(rule)] = [rule]
-
-        cancelable_rules_copy = shield.cancelable_rules.copy()
-        cancelable_rules_copy.update(cancelable_rule)
-
-        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-        rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
-
-        new_sorted = sorted(cancelable_rules_copy.keys())
-
-        shield.add_neg_rule(rule)
-        shield.cancelable_rules = cancelable_rules_copy
-        rule_chooser.set_rules_list(rule_chooser_rules_copy)
-        rule_chooser.sorted_cancel_rules = new_sorted
-
-        log.info(f"Added rule: {rule}")
-
-        rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
-        )
-        return rules_snapshot
-    
-    else:
-        enforcable_rule = dict()
-        enforcable_rule[str(rule)] = [rule]
-
-        enforcable_rules_copy = shield.enforceable_rules.copy()
-        enforcable_rules_copy.update(enforcable_rule)
-
-        rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-        rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
-
-        new_sorted = sorted(enforcable_rules_copy.keys())
-
-        shield.add_pos_rule(rule)
-        shield.enforceable_rules = enforcable_rules_copy
-        rule_chooser.set_rules_list(rule_chooser_rules_copy)
-        rule_chooser.sorted_enforceable_rules = new_sorted
-
-        log.info(f"Added rule: {rule}")
-
-        rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
-        )
-        return rules_snapshot
-
 
 def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     features_values = obs_rules.copy()
@@ -319,22 +228,23 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     return add_rule(None, shield, rule_chooser, rule_str=neg_rule)     
 
 
+def check_retention(rule, shield, rule_chooser):
+    if rule.polarity == False:
+        polarity_rule_set = rule_chooser.sorted_cancel_rules
+    else:
+        polarity_rule_set = rule_chooser.sorted_enforce_rules
 
-def get_action(model, obs, obs_rules, shield, state, last_action, feature_extractor, rule_chooser, rules_snapshot, algo_name, act_logits, action_tensor):
-    action, _states = model.predict(obs)
-    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
+        
+    # check combination
+    # always check for one feature diff and then recursive call?
+    combine_rules(rule, shield, rule_chooser)
 
-    if triggers:
-        (pos_actions_triggered, neg_actions_triggered) = triggered_actions
-        changed_action, activated_created_rules = change_action(action,pos_actions_triggered,neg_actions_triggered,algo_name,act_logits, action_tensor,
-                                        triggered_rules, change_type="favor_enforce")
-        if changed_action is not None:
-            if len(activated_created_rules) > 0:
-                log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
-            action = changed_action
-            
-    return action, triggered_rules
+    return True
 
+
+def combine_rules(rule, polarity_rule_set, shield, rule_chooser):
+    one_feature_diff = [r for r in polarity_rule_set if len(set(rule.rule_body.conditions) - set(r.rule_body.conditions)) == 1]
+    # TODO
 
 def number_of_ghosts(level):
     if level.startswith("small"):

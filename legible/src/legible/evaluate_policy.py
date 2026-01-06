@@ -13,7 +13,7 @@ from rule_learning.util import load_pickle, load_model, save_pickle
 from env_util import create_environment_and_modelname
 from shield.shields import AspShield, RuleChooser, RandomShield
 from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
-from util import RuleSnapshot
+from rule_util import RuleSnapshot
 
 
 

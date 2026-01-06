@@ -1,9 +1,11 @@
 import hydra
 from omegaconf import DictConfig
-from util import get_shield_number, get_model_number, get_feature_extractor, set_rules
+from util import get_shield_number, get_model_number, get_feature_extractor
+from rule_util import set_rules
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, evaluate
 from legible.rule_learning.util import load_model, save_pickle
+
 import sys, logging, torch
 import check_norms
 
