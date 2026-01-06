@@ -20,7 +20,10 @@ Open tasks:
 - [x] (re)check (categorical) features in rule mining
 - [x] clean up episode data collection
 - [x] (don't) consider (absolute) features e.g. x, y in some rules?
-- [ ] rule pruning? (check retention)
+- [ ] rule pruning (check retention):
+  - [ ] every time after blocking all actions?
+  - [ ] check if duplicates occur, if yes eliminate 
+- [ ] use random subset of features for adapting rules?
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
 - [x] check how intervals affect mined rules

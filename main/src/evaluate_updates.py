@@ -77,6 +77,7 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     log.info(f"Avg. violations: {stats.avg_violations} with SE {stats.stderr_violations}")
     log.info(f"Avg. steps: {stats.avg_steps} with SE {stats.stderr_steps}")
     log.info(f"Avg. action changes: {stats.avg_action_changes} with SE {stats.stderr_action_changes}")
+    log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
     stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}"
     save_pickle(stats_path, stats, exact_match=True)
 
