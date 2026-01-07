@@ -14,7 +14,9 @@ Open tasks:
     - [x] everything can be enumerated because of the intervals -> adapt rule update process
 - [ ] documentation/comments
 - [ ] add more complex norms
-- [ ] evaluation: count violations
+- [x] evaluation: 
+  - [x] count violations
+  - [x] count number of used updated rules
 - [ ] license(s)
 - [ ] attributions for legible, oftendeeprl
 - [x] (re)check (categorical) features in rule mining

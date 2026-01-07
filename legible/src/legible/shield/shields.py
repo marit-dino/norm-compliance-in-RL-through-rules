@@ -111,7 +111,7 @@ class NoopShield(Shield):
 class AspShield(Shield):
     def __init__(self,num_actions,feature_indices,feature_names,neg_rules,pos_rules,
                  feature_intervals,
-                 categorical_features):
+                 categorical_features,enforceable_rules = None, cancelable_rules = None):
         self.actions = list(range(num_actions))
         self.feature_indices = feature_indices
         self.feature_names = feature_names
@@ -125,6 +125,8 @@ class AspShield(Shield):
         self.feature_intervals = feature_intervals
         self.categorical_features = categorical_features
         self.nr_rules = len(self.pos_rules_list) + len(self.neg_rules_list)
+        self.enforceable_rules = enforceable_rules
+        self.cancelable_rules = cancelable_rules
 
 
     def add_neg_rule(self, rule):
@@ -134,21 +136,18 @@ class AspShield(Shield):
 
     def remove_neg_rule(self, rule_str):
         neg_rules_list_copy = self.neg_rules_list.copy()
-        #TODO if works also for pos
         neg_rules_list_copy = [r for r in neg_rules_list_copy if rule_str != str(string_to_rule(r))]
         self.all_neg_rules = "\n".join(neg_rules_list_copy)
         self.neg_rules_list = neg_rules_list_copy
         self.nr_rules -= 1
 
     def add_pos_rule(self, rule):
-        self.all_pos_rules += f"\n{str(rule_str)}"
-        self.pos_rules_list.append(str(rule_str))
-        #TODO check if that results in the correct order of features in the body
+        self.all_pos_rules += f"\n{str(rule)}"
+        self.pos_rules_list.append(str(rule))
         self.nr_rules += 1
 
     def remove_pos_rule(self, rule_str):
         pos_rules_list_copy = self.pos_rules_list.copy()
-        #TODO if works also for pos
         pos_rules_list_copy = [r for r in pos_rules_list_copy if rule_str != str(string_to_rule(r))]
         self.all_pos_rules = "\n".join(pos_rules_list_copy)
         self.pos_rules_list = pos_rules_list_copy
@@ -190,7 +189,11 @@ class AspShield(Shield):
 
         rules = rule_chooser.choose_rules(rules_snapshot)
         pos_rules = [rt for i, r in enumerate(rules) if str(r).startswith("action") for rt in self.transform_rule(str(r), i)]
-        neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i) ]
+        neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i)]
+        # for r in rules_snapshot.cancelable_rules.values():
+        #     #print(r)
+        #     print(f"({'M' if r[0].mined else 'NM'}){r[0]}")
+
         pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts, rules_snapshot.enforceable_rules)
         neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts, rules_snapshot.cancelable_rules)
         if len(pos_triggered) == 0 and len(neg_triggered) == 0:

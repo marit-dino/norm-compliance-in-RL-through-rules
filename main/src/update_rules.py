@@ -111,7 +111,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 less_violations_possible = []
                 last_n_states_copy = last_n_states.copy()
                 for j, state in enumerate(last_n_states):
-                    log.info(f"step {i+j-cfg.asp.horizon}: \n{state}")
+                    log.info(f"{cfg.asp.horizon - j} step(s) before violation: \n{state}")
                     if j < cfg.asp.horizon:
                         less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
                 print(less_violations_possible)

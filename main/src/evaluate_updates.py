@@ -5,6 +5,8 @@ from rule_util import set_rules
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, evaluate
 from legible.rule_learning.util import load_model, save_pickle
+from legible.shield.shields import RuleChooser 
+
 
 import sys, logging, torch
 import check_norms
@@ -52,8 +54,10 @@ def setup(cfg):
     shield_initial.feature_indices = ordered_feature_indices
     shield_updated.feature_indices = ordered_feature_indices
     shield_initial, rule_chooser_initial = set_rules(shield_initial)
-    shield_updated, rule_chooser_updated = set_rules(shield_updated)
 
+    rule_chooser_updated = RuleChooser(shield_updated)
+    rule_chooser_updated.set_rules_list(list(range(0,len(list(shield_updated.enforceable_rules.keys()) + list(shield_updated.cancelable_rules.keys()))))) 
+    
     assert hasattr(shield_initial, 'enforceable_rules')
     assert hasattr(shield_initial, 'cancelable_rules')
     assert hasattr(shield_updated, 'enforceable_rules')

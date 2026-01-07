@@ -155,7 +155,6 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
                     action_changes += 1
                     action = changed_action
                     if len(activated_created_rules) > 0:
-                        print(activated_created_rules)
                         action_changes_due_updated_rules += 1
 
 
@@ -192,7 +191,6 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
     for i in range(nr_eps):
         win,rewards,action_changes,action_changes_updated,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor, shield,rule_chooser,change_type,violation_check)
         wins.append(win)
-        print(action_changes_updated)
         all_rews.append(rewards)
         all_violations.append(violations)
         action_changes_list.append(action_changes)
@@ -223,7 +221,7 @@ def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
         shield = load_pickle(shield_name)
     else:
         shield_name = f"{shield_name}_{exact_model_number}.pkl"
-        shield = load_pickle(shield_name,  exact_match=True)
+        shield = load_pickle(shield_name, exact_match=True)
     return shield
 
 
