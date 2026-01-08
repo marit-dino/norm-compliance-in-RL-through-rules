@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 from util import get_model_number, get_shield_number, get_feature_extractor
-from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule
+from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule, prune_rule_set
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield
 from legible.create_rules_pacman import string_to_rule
@@ -94,7 +94,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if len(shield.get_blocked_actions(obs_rules)) == 4:
                 rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_triggered_rules, last_n_violations, prev_env_states, env, feature_extractor, cfg)
-                        
+                rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
+     
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
             
@@ -114,7 +115,6 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     log.info(f"{cfg.asp.horizon - j} step(s) before violation: \n{state}")
                     if j < cfg.asp.horizon:
                         less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
-                print(less_violations_possible)
                 if True in less_violations_possible:
                     prev_state, prev_action, prev_triggered_rules, prev_obs = backtrack(last_n_actions, last_n_states, last_n_triggered_rules, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
                     rules_snapshot = add_neg_rule(prev_obs, prev_action, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)

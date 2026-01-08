@@ -22,7 +22,7 @@ class RuleSnapshot:
 
 
 
-def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm):
+def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm, episodes):
     data = []
 
     obs, _info = env.reset()
@@ -35,8 +35,7 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
         cancelable_rules = shield.cancelable_rules,
     )
 
-    #TODO fix number in cfg
-    for i in range(15):
+    for i in range(episodes):
         while True:
             action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()
@@ -62,7 +61,9 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
         
 
 def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg):
-    data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm)
+    logging.disable(logging.CRITICAL)
+    data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
+    logging.disable(logging.NOTSET)
     rules_snapshot = remove_unused_rules(data, rule_chooser, shield)
     #prune_rule_conditions()
 
@@ -72,15 +73,12 @@ def optimize_rule_set():
     print("TODO")
 
 def remove_unused_rules(data, rule_chooser, shield):
-    mined_rules = [r for r in (rule_chooser.sorted_cancel_rules + rule_chooser.sorted_enforce_rules) if r.mined]
+    non_mined_rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values())) if not r[0].mined]
     flattened_data = [r for rs in data for r in rs]
 
-    for r in mined_rules:
+    for r in non_mined_rules:
         if r not in flattened_data:
             rules_snapshot = remove_rule(r, shield, rule_chooser)
-            log.info(f"remove rule : {r} based on {flattened_data}")
-            log.info(f"removed unused rule {r}")
-
     return rules_snapshot
 
 # adapted from legible
