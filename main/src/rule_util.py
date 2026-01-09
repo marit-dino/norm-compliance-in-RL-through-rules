@@ -42,12 +42,10 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
             act_logits = q_values        
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
             
-            data.append(obs_rules)
+            action, triggered_rules = get_action(model, obs, obs_rules, shield, env.unwrapped.game.state,rule_chooser, rules_snapshot, training_algorithm, act_logits, action_tensor)
+            data.append(triggered_rules)
 
-            action, _triggered_rules = get_action(model, obs, obs_rules, shield, env.unwrapped.game.state,rule_chooser, rules_snapshot, training_algorithm, act_logits, action_tensor)
-            
             obs, _reward, term, trunc, _info = env.step(action)
-
             obs_t, _vectorized_env = policy.obs_to_tensor(obs)
             obs_t = obs_t.to(action_tensor.device)
 
@@ -74,7 +72,8 @@ def optimize_rule_set():
 
 def remove_unused_rules(data, rule_chooser, shield):
     non_mined_rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values())) if not r[0].mined]
-    flattened_data = [r for rs in data for r in rs]
+
+    flattened_data = [r[0] for rs in data for rt in rs for r in rt]
 
     for r in non_mined_rules:
         if r not in flattened_data:
@@ -115,6 +114,8 @@ def save_rule_set(shield, cfg):
 def get_action(model, obs, obs_rules, shield, state, rule_chooser, rules_snapshot, algo_name, act_logits, action_tensor):
     action, _state = model.predict(obs)
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
+    if triggered_rules == None:
+        triggered_rules = []
     
     from legible.evaluate_policy import change_action
 
@@ -126,7 +127,7 @@ def get_action(model, obs, obs_rules, shield, state, rule_chooser, rules_snapsho
             if len(activated_created_rules) > 0:
                 log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
             action = changed_action
-            
+    
     return action, triggered_rules
 
 

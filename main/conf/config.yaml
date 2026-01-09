@@ -21,8 +21,8 @@ rules:
   shield_number:
   updates:
     exclude_features_in_neg_rules: [0,1,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,32,33,39,40,41,42,52,53,54,55,56,57,58,59,60,61] # ONLY VEG RIGHT NOW + TODO rename
-    episodes: 200 
-    data_collection_episodes: 25 
+    episodes: 250 
+    data_collection_episodes: 100
 
 asp:
   horizon: 2
