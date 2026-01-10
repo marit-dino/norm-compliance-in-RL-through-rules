@@ -14,6 +14,12 @@ from env_util import create_environment_and_modelname
 from shield.shields import AspShield, RuleChooser, RandomShield
 from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from rule_util import RuleSnapshot
+import copy, logging
+from collections import deque 
+
+
+log = logging.getLogger(__name__)
+
 
 
 
@@ -116,7 +122,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -127,7 +133,9 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
     action_changes = 0
     action_changes_due_updated_rules = 0
     total_violations = 0
-    last_action = None
+    last_n_states = deque(maxlen=horizon+1)
+
+
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
         cancelable_rules = shield.cancelable_rules,
@@ -159,15 +167,19 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
 
 
         obs, reward, term, trunc, info = env.step(action)
+        last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
 
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
-        last_action = action
         rewards.append(reward)
 
         if violation_check != None:
-            total_violations += violation_check(env.unwrapped.game.state)
-
+            tmp_violations = violation_check(env.unwrapped.game.state)
+            if tmp_violations > 0:
+                total_violations += tmp_violations
+                for j, state in enumerate(last_n_states):
+                    log.info(f"{horizon - j} step(s) before violation: \n{state}")
+    
         if term and reward > 0:
             win = True # TODO check if true for all environments
         if term or trunc:
@@ -177,7 +189,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor, shiel
     return win, rewards, action_changes, action_changes_due_updated_rules, total_violations
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
@@ -189,7 +201,7 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
     wins = []
     all_violations = []
     for i in range(nr_eps):
-        win,rewards,action_changes,action_changes_updated,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor, shield,rule_chooser,change_type,violation_check)
+        win,rewards,action_changes,action_changes_updated,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,shield,rule_chooser,change_type,violation_check)
         wins.append(win)
         all_rews.append(rewards)
         all_violations.append(violations)

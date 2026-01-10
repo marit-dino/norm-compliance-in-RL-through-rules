@@ -18,6 +18,7 @@ Open tasks:
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules
+  - [ ] log rules which applied when violation occurs
 - [ ] license(s)
 - [ ] attributions for legible, oftendeeprl
 - [x] (re)check (categorical) features in rule mining
