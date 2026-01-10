@@ -74,11 +74,33 @@ def remove_unused_rules(data, rule_chooser, shield):
     non_mined_rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values())) if not r[0].mined]
 
     flattened_data = [r[0] for rs in data for rt in rs for r in rt]
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
 
     for r in non_mined_rules:
         if r not in flattened_data:
             rules_snapshot = remove_rule(r, shield, rule_chooser)
     return rules_snapshot
+
+def add_retaining_rules(rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg):
+    logging.disable(logging.CRITICAL)
+    data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
+    logging.disable(logging.NOTSET)
+    flattened_data = [r[0] for rs in data for rt in rs for r in rt]
+    
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
+
+    for r in rules:
+        if r in flattened_data:
+            rules_snapshot = add_rule(r, shield, rule_chooser)
+    return rules_snapshot
+
+
 
 # adapted from legible
 def set_rules(shield):
@@ -228,4 +250,5 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
             cancelable_rules = cancelable_rules_copy,
         )
         return rules_snapshot
+    
 

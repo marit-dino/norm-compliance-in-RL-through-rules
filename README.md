@@ -24,9 +24,8 @@ Open tasks:
 - [x] clean up episode data collection
 - [x] (don't) consider (absolute) features e.g. x, y in some rules?
 - [ ] rule pruning (check retention):
-  - [ ] every time after blocking all actions, since this adds a lot of rules?
-  - [ ] check if duplicates even can occur, if yes eliminate 
-  - [ ] instead of adding and then removing rules, check retention first
+  - [ ] pruning on condition level
+  - [x] instead of adding and then removing rules, check retention first
 - [ ] use random subset of features for adapting rules?
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state

@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 from util import get_model_number, get_shield_number, get_feature_extractor
-from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule, prune_rule_set
+from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule, prune_rule_set, add_retaining_rules
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield
 from legible.create_rules_pacman import string_to_rule
@@ -92,7 +92,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
 
             if len(shield.get_blocked_actions(obs_rules)) == 4:
-                rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, cfg)
+                rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
                 rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
      
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
@@ -132,9 +132,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 last_n_states.append(env.unwrapped.game.state)
                 break
         
-        # collect_data()
-        # prune_rule_set()
-        # optimize_rule_set()
+        if i % cfg.rules.updates.prune_interval == 0:
+            rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
 
     log.info(f"Total Violations: {total_violations}")
 
@@ -149,7 +148,7 @@ def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violat
 
 
 
-def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, cfg):
+def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
     neg_actions = [r[0].rule_head.action for r in neg_rules_triggered]
@@ -170,11 +169,11 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
         state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
-        rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
+        rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
         return rules_snapshot
 
 
-def add_differing_enumerable_features(mined_rule,state_features, categorical_features, shield, rule_chooser, exclude_features_in_neg_rules):
+def add_differing_enumerable_features(mined_rule,state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
     discretized_features = shield.discretize(features_dict_to_array(state_features)).astype(int)
 
     feature_facts = {
@@ -186,7 +185,7 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
-        if fi in exclude_features_in_neg_rules or fi in feature_indices_in_rule:
+        if fi in cfg.rules.updates.exclude_features_in_neg_rules or fi in feature_indices_in_rule:
             continue
         elif fi in categorical_features:
             for i,r in enumerate(adapted_rules):
@@ -199,8 +198,7 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
                         tmp_rule_list.append(r.add_feature(fi, interval))
             adapted_rules = tmp_rule_list
     rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
-    for r in adapted_rules:
-        rules_snapshot = add_rule(r, shield, rule_chooser)
+    rules_snapshot = add_retaining_rules(adapted_rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
     return rules_snapshot
        
 
