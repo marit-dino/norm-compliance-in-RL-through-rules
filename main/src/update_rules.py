@@ -63,6 +63,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_states = deque(maxlen=cfg.asp.horizon+1)
     last_n_actions = deque(maxlen=cfg.asp.horizon+1)
     prev_env_states = deque(maxlen=cfg.asp.horizon+1)
+    last_n_triggered_rules = deque(maxlen=cfg.asp.horizon+1)
+
 
     obs, info = env.reset()
     policy = model.policy
@@ -72,6 +74,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_violations.append(0)
     last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
     prev_env_states.append(env.unwrapped.save_state())
+    last_n_triggered_rules.append([])
+
 
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norms, num_norms=len(cfg.norms))
@@ -93,9 +97,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if len(shield.get_blocked_actions(obs_rules)) == 4:
                 rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
-     
+
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
-            
+            last_n_triggered_rules.append(triggered_rules)
+
             obs, reward, term, trunc, info = env.step(action)
             last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
             last_n_actions.append(action)
@@ -109,12 +114,30 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 less_violations_possible = []
                 last_n_states_copy = last_n_states.copy()
                 for j, state in enumerate(last_n_states):
-                    log.info(f"{cfg.asp.horizon - j} step(s) before violation: \n{state}")
+                    if cfg.asp.horizon - j != 0: 
+                        log.info(
+                            f"{cfg.asp.horizon - j} step(s) before violation:\n{state}\n"
+                            f"triggered rules:\n\t"
+                            f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
+                            f"action: {last_n_actions[j+1]}"
+                        )
+                    else:
+                        log.info(
+                            f"violation:\n{state}\n"
+                        )
                     if j < cfg.asp.horizon:
                         less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
+                
                 if True in less_violations_possible:
                     prev_state, prev_action, prev_obs = backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
                     rules_snapshot = add_neg_rule(prev_obs, prev_action, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
+                    pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[-1] if r != [] and r[0][0].polarity]
+                    if pos_triggered_rules == []:
+                        continue
+                    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+                    for r in pos_triggered_rules:
+                        rules_snapshot = remove_rule(r, shield, rule_chooser)
+                        rules_snapshot = add_differing_enumerable_features(r, feature_extractor.getFeatures(last_n_states[-2],last_n_actions[-1]), categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
                     continue
                 else:
                     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
@@ -129,9 +152,11 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 last_n_actions.append(None)
                 last_n_violations.append(0)
                 last_n_states.append(env.unwrapped.game.state)
+                last_n_triggered_rules.append([])
                 break
         
         if i % cfg.rules.updates.prune_interval == 0:
+            log.info("Pruning rules.")
             rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
 
     log.info(f"Total Violations: {total_violations}")
@@ -168,6 +193,7 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
         state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+        rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
         rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
         return rules_snapshot
 
@@ -196,7 +222,6 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
                     if feature_facts[fi] != interval:
                         tmp_rule_list.append(r.add_feature(fi, interval))
             adapted_rules = tmp_rule_list
-    rules_snapshot = remove_rule(mined_rule, shield, rule_chooser)
     rules_snapshot = add_retaining_rules(adapted_rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
     return rules_snapshot
        
@@ -215,24 +240,6 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     neg_rule = neg_rule[:-1] + "."
     return add_rule(None, shield, rule_chooser, rule_str=neg_rule)     
 
-
-def check_retention(rule, shield, rule_chooser):
-    if rule.polarity == False:
-        polarity_rule_set = rule_chooser.sorted_cancel_rules
-    else:
-        polarity_rule_set = rule_chooser.sorted_enforce_rules
-
-        
-    # check combination
-    # always check for one feature diff and then recursive call?
-    combine_rules(rule, shield, rule_chooser)
-
-    return True
-
-
-def combine_rules(rule, polarity_rule_set, shield, rule_chooser):
-    one_feature_diff = [r for r in polarity_rule_set if len(set(rule.rule_body.conditions) - set(r.rule_body.conditions)) == 1]
-    # TODO
 
 def number_of_ghosts(level):
     if level.startswith("small"):

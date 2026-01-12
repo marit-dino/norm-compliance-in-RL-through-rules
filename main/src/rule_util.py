@@ -176,13 +176,13 @@ def remove_rule(rule, shield, rule_chooser):
     
     else:
         rule_chooser_rules_copy = rule_chooser.rules_list.copy()
-        rule_chooser_rules_copy.remove(-1)
-        enforcable_rules_copy = shield.enforceable_rules.copy()
-        enforcable_rules_copy = {k: v for k,v in enforcable_rules_copy.items() if string_to_rule(k) != rule}
-        new_sorted = sorted(enforcable_rules_copy.keys())
+        rule_chooser_rules_copy.pop()
+        enforceable_rules_copy = shield.enforceable_rules.copy()
+        enforceable_rules_copy = {k: v for k,v in enforceable_rules_copy.items() if string_to_rule(k) != rule}
+        new_sorted = sorted(enforceable_rules_copy.keys())
 
         shield.remove_pos_rule(str(rule))
-        shield.enforceable_rules = enforcable_rules_copy
+        shield.enforceable_rules = enforceable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_enforceable_rules = new_sorted
 
@@ -190,7 +190,7 @@ def remove_rule(rule, shield, rule_chooser):
 
         rules_snapshot = RuleSnapshot(
             enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
+            cancelable_rules = enforceable_rules_copy,
         )
         return rules_snapshot
 
