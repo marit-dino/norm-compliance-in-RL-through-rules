@@ -18,7 +18,7 @@ Open tasks:
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules
-  - [ ] log rules which applied when violation occurs
+  - [x] log rules which applied when violation occurs
 - [ ] license(s)
 - [ ] attributions for legible, oftendeeprl
 - [x] (re)check (categorical) features in rule mining
@@ -27,7 +27,6 @@ Open tasks:
 - [ ] rule pruning (check retention):
   - [ ] pruning on condition level
   - [x] instead of adding and then removing rules, check retention first
-- [ ] use random subset of features for adapting rules?
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
 - [x] check how intervals affect mined rules

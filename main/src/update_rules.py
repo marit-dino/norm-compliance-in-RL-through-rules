@@ -93,7 +93,6 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if len(shield.get_blocked_actions(obs_rules)) == 4:
                 rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
-                rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
      
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             
