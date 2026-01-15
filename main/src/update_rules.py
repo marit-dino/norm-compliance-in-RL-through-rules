@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig
 from util import get_model_number, get_shield_number, get_feature_extractor
-from rule_util import set_rules, save_rule_set, RuleSnapshot, get_action, remove_rule, add_rule, prune_rule_set, add_retaining_rules
+from rule_util import *
 from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield
 from legible.create_rules_pacman import string_to_rule
@@ -34,7 +34,7 @@ def setup(cfg):
 
     #TODO what is difference between uncorr and improved?
     shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
+                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", horizon=cfg.asp.horizon, radius=cfg.asp.radius)
 
     if shield is None:
         sys.exit("Could not load shield, check if it exists.")
@@ -155,7 +155,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 last_n_triggered_rules.append([])
                 break
         
-        if i % cfg.rules.updates.prune_interval == 0:
+        if i % cfg.rules.updates.prune_interval == 0 and i != 0:
             log.info("Pruning rules.")
             rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
 
@@ -222,6 +222,7 @@ def add_differing_enumerable_features(mined_rule,state_features, categorical_fea
                     if feature_facts[fi] != interval:
                         tmp_rule_list.append(r.add_feature(fi, interval))
             adapted_rules = tmp_rule_list
+    log.info("Testing rules for retention")
     rules_snapshot = add_retaining_rules(adapted_rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
     return rules_snapshot
        
@@ -238,8 +239,7 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     for f in relevant_facts:
         neg_rule += f"{f},"
     neg_rule = neg_rule[:-1] + "."
-    return add_rule(None, shield, rule_chooser, rule_str=neg_rule)     
-
+    return add_rule(None, shield, rule_chooser, rule_str=neg_rule)
 
 def number_of_ghosts(level):
     if level.startswith("small"):

@@ -9,10 +9,10 @@ Open tasks:
     - [x] update method for rules to exlude specific states
     - [x] check whether less violations are possible in asp
     - [x] what to do if backtracking exceeds horizon? (should this even happen? No)
-    - [ ] fix "looping" in same violation for a few steps that happens from time to time
+    - [x] fix "looping" in same violation for a few steps that happens from time to time
     - [x] store updated rule set
     - [x] everything can be enumerated because of the intervals -> adapt rule update process
-    - [ ] save rules as string in pickle instead of object (-> add some tag to identify udpated rules) 
+    - [ ] save rules as string in pickle instead of object (-> add some tag to identify udpated rules)?
 - [ ] documentation/comments
 - [ ] add more complex norms
 - [x] evaluation: 
@@ -24,8 +24,9 @@ Open tasks:
 - [x] (re)check (categorical) features in rule mining
 - [x] clean up episode data collection
 - [x] (don't) consider (absolute) features e.g. x, y in some rules?
-- [ ] rule pruning (check retention):
-  - [ ] pruning on condition level
+- [x] rule pruning (check retention):
+  - [x] combine rules
+  - [ ] move merging to rest of pruning
   - [x] instead of adding and then removing rules, check retention first
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state

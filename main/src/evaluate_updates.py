@@ -41,10 +41,10 @@ def setup(cfg):
 
     #TODO move to util?
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn")
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn",horizon=cfg.asp.horizon,radius=cfg.asp.radius)
     
     shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True)
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True,horizon=cfg.asp.horizon,radius=cfg.asp.radius)
 
     if shield_initial is None:
         sys.exit("Could not load initial shield, check if it exists.")

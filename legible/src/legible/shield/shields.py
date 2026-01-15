@@ -190,9 +190,6 @@ class AspShield(Shield):
         rules = rule_chooser.choose_rules(rules_snapshot)
         pos_rules = [rt for i, r in enumerate(rules) if str(r).startswith("action") for rt in self.transform_rule(str(r), i)]
         neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i)]
-        # for r in rules_snapshot.cancelable_rules.values():
-        #     #print(r)
-        #     print(f"({'M' if r[0].mined else 'NM'}){r[0]}")
 
         pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts, rules_snapshot.enforceable_rules)
         neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts, rules_snapshot.cancelable_rules)

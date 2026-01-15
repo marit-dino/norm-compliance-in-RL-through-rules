@@ -26,7 +26,7 @@ def mine_rules(cfg : DictConfig) -> None:
     feature_and_rule_learn.select_features_and_learn_rules(cfg.env.name, cfg.training.steps_initial, cfg.env.level, cfg.rules.episodes,
                                                            cfg.rules.nr_features, cfg.rules.lime_test_size, cfg.rules.compute_correlation,
                                                             "norm_guided_dqn", cfg.training.feature_extractor, exact_model_number=model_number, steps_norm=cfg.training.steps_norm,
-                                                            norm_descriptor=config_str, feature_extractor_rules=cfg.rules.feature_extractor)    
+                                                            horizon=cfg.asp.horizon, radius=cfg.asp.radius,norm_descriptor=config_str, feature_extractor_rules=cfg.rules.feature_extractor)    
 
 if __name__ == "__main__":
     mine_rules()

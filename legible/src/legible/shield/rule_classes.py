@@ -73,6 +73,11 @@ class Rule:
         mutated_body_conds = list(copy.deepcopy(self.rule_body.conditions))
         mutated_body_conds.append(Fact(feature,feature_valuation))
         return Rule(self.polarity,self.rule_head, RuleBody(mutated_body_conds))
+    
+    def remove_feature(self,feature,feature_valuation):
+        mutated_body_conds = list(copy.deepcopy(self.rule_body.conditions))
+        mutated_body_conds.remove(Fact(feature,feature_valuation))
+        return Rule(self.polarity,self.rule_head, RuleBody(mutated_body_conds))
 
     def __str__(self):
         rule_str_start = "-" if not self.polarity else ""

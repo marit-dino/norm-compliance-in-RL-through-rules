@@ -3,8 +3,7 @@ from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from legible.rule_learning.util import save_pickle
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
-
-
+import check_norms
 
 log = logging.getLogger(__name__)
 
@@ -22,8 +21,8 @@ class RuleSnapshot:
 
 
 
-def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm, episodes):
-    data = []
+def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm, episodes, norms):
+    triggered_rules_list = []
 
     obs, _info = env.reset()
     policy = model.policy
@@ -43,7 +42,7 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
             
             action, triggered_rules = get_action(model, obs, obs_rules, shield, env.unwrapped.game.state,rule_chooser, rules_snapshot, training_algorithm, act_logits, action_tensor)
-            data.append(triggered_rules)
+            triggered_rules_list.append(triggered_rules)
 
             obs, _reward, term, trunc, _info = env.step(action)
             obs_t, _vectorized_env = policy.obs_to_tensor(obs)
@@ -55,20 +54,43 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
                 obs_t = obs_t.to(action_tensor.device)
                 break
 
-    return data
+    return triggered_rules_list
         
 
 def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg):
     logging.disable(logging.CRITICAL)
-    data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
+    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
     logging.disable(logging.NOTSET)
-    rules_snapshot = remove_unused_rules(data, rule_chooser, shield)
-    #prune_rule_conditions()
+    return remove_unused_rules(rule_data, rule_chooser, shield)
 
+
+# TODO think about rules_snapshot here (remove it from parameters)
+def merge_rules(rule, shield, rule_chooser, rules_snapshot):
+    rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values()))]
+    one_differing_val_rules = [r for r in rules 
+                                if len(list(set(rule.rule_body.conditions) - set(r.rule_body.conditions))) == 1 
+                                and len(list(set(r.rule_body.conditions) - set(rule.rule_body.conditions))) == 1
+                                and [f.feature for f in r.rule_body.conditions] == [f.feature for f in rule.rule_body.conditions]]
+    if len(one_differing_val_rules) == 0:
+        return rules_snapshot
+    
+    f = list(set(rule.rule_body.conditions) - set(one_differing_val_rules[0].rule_body.conditions))[0].feature
+    v = list(set(rule.rule_body.conditions) - set(one_differing_val_rules[0].rule_body.conditions))[0].valuation
+    rule.mined = False
+    one_differing_val_rules.append(rule)
+
+    #make sure that all have different values for the feature
+    if len(set(one_differing_val_rules)) == len(shield.feature_intervals[f]):
+        log.info("Merging rules.")
+        for r in one_differing_val_rules:
+            rules_snapshot = remove_rule(r, shield, rule_chooser)
+        merged_rule = rule.remove_feature(f, v)
+        rules_snapshot = add_rule(merged_rule, shield, rule_chooser)
+        return merge_rules(merged_rule, shield, rule_chooser, rules_snapshot)
+    
     return rules_snapshot
 
-def optimize_rule_set():
-    print("TODO")
+
 
 def remove_unused_rules(data, rule_chooser, shield):
     non_mined_rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values())) if not r[0].mined]
@@ -86,9 +108,9 @@ def remove_unused_rules(data, rule_chooser, shield):
 
 def add_retaining_rules(rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg):
     logging.disable(logging.CRITICAL)
-    data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
+    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
     logging.disable(logging.NOTSET)
-    flattened_data = [r[0] for rs in data for rt in rs for r in rt]
+    flattened_data = [r[0] for rs in rule_data for rt in rs for r in rt]
     
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -99,7 +121,6 @@ def add_retaining_rules(rules, shield, rule_chooser, model, env, action_tensor, 
         if r in flattened_data:
             rules_snapshot = add_rule(r, shield, rule_chooser)
     return rules_snapshot
-
 
 
 # adapted from legible
@@ -123,7 +144,7 @@ def set_rules(shield):
 
 def save_rule_set(shield, cfg):
     shield_name = f"pickles/shields/uncorr/"\
-                  f"norm_guided_dqn_{cfg.env.name.replace('/','_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_"\
+                  f"norm_guided_dqn_{cfg.env.name.replace('/','_')}_{cfg.env.level}_{cfg.asp.horizon}_{cfg.asp.radius}_feat_{cfg.rules.nr_features}_"\
                   f"{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
 
     if cfg.rules.shield_number is None:
@@ -189,8 +210,8 @@ def remove_rule(rule, shield, rule_chooser):
         log.info(f"Removed rule: {rule}")
 
         rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = enforceable_rules_copy,
+            enforceable_rules = enforceable_rules_copy,
+            cancelable_rules = shield.cancelable_rules,
         )
         return rules_snapshot
 
@@ -224,31 +245,31 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
             enforceable_rules = shield.enforceable_rules,
             cancelable_rules = cancelable_rules_copy,
         )
-        return rules_snapshot
+        return merge_rules(rule, shield, rule_chooser, rules_snapshot)
     
     else:
         enforcable_rule = dict()
         enforcable_rule[str(rule)] = [rule]
 
-        enforcable_rules_copy = shield.enforceable_rules.copy()
-        enforcable_rules_copy.update(enforcable_rule)
+        enforceable_rules_copy = shield.enforceable_rules.copy()
+        enforceable_rules_copy.update(enforcable_rule)
 
         rule_chooser_rules_copy = rule_chooser.rules_list.copy()
         rule_chooser_rules_copy.append(len(rule_chooser.rules_list))
 
-        new_sorted = sorted(enforcable_rules_copy.keys())
+        new_sorted = sorted(enforceable_rules_copy.keys())
 
         shield.add_pos_rule(rule)
-        shield.enforceable_rules = enforcable_rules_copy
+        shield.enforceable_rules = enforceable_rules_copy
         rule_chooser.set_rules_list(rule_chooser_rules_copy)
         rule_chooser.sorted_enforceable_rules = new_sorted
 
         log.info(f"Added rule: {rule}")
 
         rules_snapshot = RuleSnapshot(
-            enforceable_rules = shield.enforceable_rules,
-            cancelable_rules = cancelable_rules_copy,
+            enforceable_rules = enforceable_rules_copy,
+            cancelable_rules = shield.cancelable_rules,
         )
-        return rules_snapshot
+        return merge_rules(rule, shield, rule_chooser, rules_snapshot)
     
 
