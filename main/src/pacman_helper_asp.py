@@ -10,7 +10,7 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
 
     def __init__(self, horizon, radius, ghosts, norms, num_norms):
         self.ctl = clingo.Control(
-            ["-c", f"max_horizon={horizon+1}",
+            ["-c", f"max_horizon={horizon}",
              "-c", f"radius={radius}",
              "-c", f"num_norms={num_norms}",
              "-c", f"ghosts={ghosts}"])

@@ -69,9 +69,12 @@ def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_ch
     return rules_snapshot
 
 
-# TODO think about rules_snapshot here (remove it from parameters)
-def merge_rules(rule, shield, rule_chooser, rules_snapshot):
+def merge_rules(rule, shield, rule_chooser):
     rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values()))]
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
     one_differing_val_rules = [r for r in rules 
                                 if len(list(set(rule.rule_body.conditions) - set(r.rule_body.conditions))) == 1 
                                 and len(list(set(r.rule_body.conditions) - set(rule.rule_body.conditions))) == 1
@@ -81,7 +84,6 @@ def merge_rules(rule, shield, rule_chooser, rules_snapshot):
     
     f = list(set(rule.rule_body.conditions) - set(one_differing_val_rules[0].rule_body.conditions))[0].feature
     v = list(set(rule.rule_body.conditions) - set(one_differing_val_rules[0].rule_body.conditions))[0].valuation
-    rule.mined = False
     one_differing_val_rules.append(rule)
 
     #make sure that all have different values for the feature
@@ -91,7 +93,7 @@ def merge_rules(rule, shield, rule_chooser, rules_snapshot):
             rules_snapshot = remove_rule(r, shield, rule_chooser)
         merged_rule = rule.remove_feature(f, v)
         rules_snapshot = add_rule(merged_rule, shield, rule_chooser)
-        return merge_rules(merged_rule, shield, rule_chooser, rules_snapshot)
+        return merge_rules(merged_rule, shield, rule_chooser)
     
     return rules_snapshot
 
@@ -173,7 +175,7 @@ def get_action(model, obs, obs_rules, shield, state, rule_chooser, rules_snapsho
                                         triggered_rules, change_type="favor_enforce")
         if changed_action is not None:
             if len(activated_created_rules) > 0:
-                log.info(f"Updated rule(s) used:\n {[str(r[0]) for r in activated_created_rules]}\nin state\n{state}")
+                log.info(f"Updated rule(s) used:\n\t{"\n\t".join([str(r[0]) for r in activated_created_rules])}\nin state\n{state}")
             action = changed_action
     
     return action, triggered_rules

@@ -59,11 +59,11 @@ def setup(cfg):
 
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     total_violations = 0
-    last_n_violations = deque(maxlen=cfg.asp.horizon+1)
-    last_n_states = deque(maxlen=cfg.asp.horizon+1)
-    last_n_actions = deque(maxlen=cfg.asp.horizon+1)
-    prev_env_states = deque(maxlen=cfg.asp.horizon+1)
-    last_n_triggered_rules = deque(maxlen=cfg.asp.horizon+1)
+    last_n_violations = deque(maxlen=cfg.asp.horizon)
+    last_n_states = deque(maxlen=cfg.asp.horizon)
+    last_n_actions = deque(maxlen=cfg.asp.horizon)
+    prev_env_states = deque(maxlen=cfg.asp.horizon)
+    last_n_triggered_rules = deque(maxlen=cfg.asp.horizon)
 
 
     obs, info = env.reset()
@@ -112,11 +112,11 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if last_n_violations[-1] > 0:
                 less_violations_possible = []
-                last_n_states_copy = last_n_states.copy()
+                last_n_states_copy = copy.deepcopy(last_n_states)
                 for j, state in enumerate(last_n_states):
-                    if cfg.asp.horizon - j != 0: 
+                    if cfg.asp.horizon - j - 1 != 0: 
                         log.info(
-                            f"{cfg.asp.horizon - j} step(s) before violation:\n{state}\n"
+                            f"{cfg.asp.horizon - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
                             f"action: {last_n_actions[j+1]}"
@@ -125,20 +125,20 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                         log.info(
                             f"violation:\n{state}\n"
                         )
-                    if j < cfg.asp.horizon:
-                        less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j+1))
+                    if j < cfg.asp.horizon and j > 0:
+                        less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j))
                 
                 if True in less_violations_possible:
-                    prev_state, prev_action, prev_obs = backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
-                    rules_snapshot = add_neg_rule(prev_obs, prev_action, shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
+                    prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
+                    rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[-1] if r != [] and r[0][0].polarity]
-                    if pos_triggered_rules == []:
-                        continue
                     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
                         rules_snapshot = add_differing_enumerable_features(r, feature_extractor.getFeatures(last_n_states[-2],last_n_actions[-1]), categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
-                    continue
+                    backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
+
+                    
                 else:
                     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
 
@@ -146,9 +146,9 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 obs, info = env.reset()
                 obs_t, vectorized_env = policy.obs_to_tensor(obs)
                 obs_t = obs_t.to(action_tensor.device)
-                last_n_states = deque(maxlen=cfg.asp.horizon+1)
-                last_n_actions = deque(maxlen=cfg.asp.horizon+1)
-                last_n_violations = deque(maxlen=cfg.asp.horizon+1)
+                last_n_states = deque(maxlen=cfg.asp.horizon)
+                last_n_actions = deque(maxlen=cfg.asp.horizon)
+                last_n_violations = deque(maxlen=cfg.asp.horizon)
                 last_n_actions.append(None)
                 last_n_violations.append(0)
                 last_n_states.append(env.unwrapped.game.state)
@@ -162,13 +162,14 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     log.info(f"Total Violations: {total_violations}")
 
 
+# TODO check if violations are handled correctly
 def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=True):
     env.unwrapped.load_state(prev_env_states[-2])   
     prev_env_states.pop()
     if violation:
         last_n_violations.pop()
-    prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
-    return last_n_states.pop(), last_n_actions.pop(), prev_obs
+    last_n_states.pop()
+    last_n_actions.pop()
 
 
 
@@ -184,8 +185,8 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
 
     if False not in list(actions_blocked_by_created_rules.values()):
-        log.info(f"Backtracking, all actions are blocked by created rules")
-        prev_state, prev_action, prev_obs = backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
+        prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
+        backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
         rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
         return rules_snapshot
     else:

@@ -13,6 +13,7 @@ Open tasks:
     - [x] store updated rule set
     - [x] everything can be enumerated because of the intervals -> adapt rule update process
     - [ ] save rules as string in pickle instead of object (-> add some tag to identify udpated rules)?
+    - [x] check why "nothing to update" does not occur anymore
 - [ ] documentation/comments
 - [ ] add more complex norms
 - [x] evaluation: 

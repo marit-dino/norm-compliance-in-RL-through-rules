@@ -133,8 +133,8 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
     action_changes = 0
     action_changes_due_updated_rules = 0
     total_violations = 0
-    last_n_states = deque(maxlen=horizon+1)
-    last_n_triggered_rules = deque(maxlen=horizon+1)
+    last_n_states = deque(maxlen=horizon)
+    last_n_triggered_rules = deque(maxlen=horizon)
     last_n_triggered_rules.append([])
 
 
@@ -183,7 +183,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
             if tmp_violations > 0:
                 total_violations += tmp_violations
                 for j, state in enumerate(last_n_states):
-                    if horizon - j != 0: 
+                    if horizon - j - 1 != 0: 
                         log.info(
                             f"{horizon - j} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
