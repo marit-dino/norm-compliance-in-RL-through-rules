@@ -26,7 +26,7 @@ Open tasks:
 - [x] (don't) consider (absolute) features e.g. x, y in some rules?
 - [x] rule pruning (check retention):
   - [x] combine rules
-  - [ ] move merging to rest of pruning
+  - [x] move merging to rest of pruning
   - [x] instead of adding and then removing rules, check retention first
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state

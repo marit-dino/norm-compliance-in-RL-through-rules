@@ -61,7 +61,12 @@ def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_ch
     logging.disable(logging.CRITICAL)
     rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
     logging.disable(logging.NOTSET)
-    return remove_unused_rules(rule_data, rule_chooser, shield)
+    rules_snapshot = remove_unused_rules(rule_data, rule_chooser, shield)
+    
+    rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values()))]
+    for r in rules:
+        rules_snapshot = merge_rules(r, shield, rule_chooser)
+    return rules_snapshot
 
 
 # TODO think about rules_snapshot here (remove it from parameters)
@@ -245,7 +250,7 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
             enforceable_rules = shield.enforceable_rules,
             cancelable_rules = cancelable_rules_copy,
         )
-        return merge_rules(rule, shield, rule_chooser, rules_snapshot)
+        return rules_snapshot
     
     else:
         enforcable_rule = dict()
@@ -270,6 +275,6 @@ def add_rule(rule, shield, rule_chooser, rule_str = None):
             enforceable_rules = enforceable_rules_copy,
             cancelable_rules = shield.cancelable_rules,
         )
-        return merge_rules(rule, shield, rule_chooser, rules_snapshot)
+        return rules_snapshot
     
 
