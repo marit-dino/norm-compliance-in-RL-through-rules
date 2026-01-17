@@ -185,7 +185,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                 for j, state in enumerate(last_n_states):
                     if horizon - j - 1 != 0: 
                         log.info(
-                            f"{horizon - j} step(s) before violation:\n{state}\n"
+                            f"{horizon - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
                         )

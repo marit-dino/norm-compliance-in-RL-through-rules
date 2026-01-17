@@ -17,7 +17,6 @@ def setup(cfg):
 
     shield_number = get_shield_number(cfg)
 
-    #TODO move to util?
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn",horizon=cfg.asp.horizon,radius=cfg.asp.radius)
     
@@ -49,9 +48,7 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     def count_violations(state):
         return check_norms.num_violations_detected(cfg.norms, state)
     
-    #logging.disable(logging.CRITICAL)
-    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations)
-    #logging.disable(logging.NOTSET)
+    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon)
 
     log.info(f"Nr. wins: {stats.nr_wins}")
     log.info(f"Avg. reward: {stats.avg_rew} with SE {stats.stderr_rew}")
