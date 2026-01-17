@@ -146,7 +146,7 @@ def set_rules(shield):
     shield.cancelable_rules = cancelable_rules
     rule_chooser = RuleChooser(shield)
     rule_chooser.set_rules_list(list(range(0,len(list(enforceable_rules.keys()) + list(cancelable_rules.keys())))))
-    return shield, rule_chooser
+    return rule_chooser
     
 
 def save_rule_set(shield, cfg):

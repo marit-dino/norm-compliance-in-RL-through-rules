@@ -3,8 +3,8 @@ Code for my master's thesis.
 
 Open tasks:
 - [x] start training from main
-- [ ] adapt feature extractors (think about which features i want)
 - [x] mine rules
+- [ ] adapt feature extractor
 - [ ] update process
     - [x] update method for rules to exlude specific states
     - [x] check whether less violations are possible in asp

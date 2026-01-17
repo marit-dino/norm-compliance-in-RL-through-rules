@@ -1,10 +1,9 @@
 import hydra
 from omegaconf import DictConfig
-from util import get_shield_number, get_model_number, get_feature_extractor
+from util import get_shield_number, get_model_number, get_feature_extractor, setup_model, order_feature_indices
 from rule_util import set_rules
-from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield, evaluate
-from legible.rule_learning.util import load_model, save_pickle
+from legible.rule_learning.util import save_pickle
 from legible.shield.shields import RuleChooser 
 
 
@@ -14,30 +13,9 @@ import check_norms
 log = logging.getLogger(__name__)
 
 def setup(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
+    env, model, model_name, action_tensor = setup_model(cfg)
 
-    env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
-                                                                                    cfg.env.level, config_str, 
-                                                                                    cfg.training.steps_initial, cfg.training.steps_norm,
-                                                                                    cfg.training.feature_extractor)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_actions = env.action_space.n
-    action_tensor = torch.tensor(range(num_actions), device=device)
-
-    model_number = get_model_number(cfg)
-    model = load_model(model_path + f"_{model_number}","norm_guided_dqn",env=env,exact_match=True)
     shield_number = get_shield_number(cfg)
-
-    obs, info = env.reset()
-    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    features = feature_extractor.getFeatures(env.unwrapped.game.state,None)
-    ordered_features = sorted(list(features.items()),key=lambda x: x[0])
-    feature_to_index = {
-        name: idx for idx, name in enumerate(features)
-    }
-    ordered_feature_indices = [feature_to_index[fv[0]] for fv in ordered_features]
-
 
     #TODO move to util?
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
@@ -51,9 +29,9 @@ def setup(cfg):
     if shield_updated is None:
         sys.exit("Could not load updated shield, check if it exists.")
 
-    shield_initial.feature_indices = ordered_feature_indices
-    shield_updated.feature_indices = ordered_feature_indices
-    shield_initial, rule_chooser_initial = set_rules(shield_initial)
+    order_feature_indices(shield_initial, env, cfg.rules.feature_extractor)
+    order_feature_indices(shield_updated, env, cfg.rules.feature_extractor)
+    rule_chooser_initial = set_rules(shield_initial)
 
     rule_chooser_updated = RuleChooser(shield_updated)
     rule_chooser_updated.set_rules_list(list(range(0,len(list(shield_updated.enforceable_rules.keys()) + list(shield_updated.cancelable_rules.keys()))))) 

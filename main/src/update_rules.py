@@ -1,15 +1,12 @@
 import hydra
 from omegaconf import DictConfig
-from util import get_model_number, get_shield_number, get_feature_extractor
+from util import setup_model, get_shield_number, get_feature_extractor, order_feature_indices
 from rule_util import *
-from legible.env_util import create_environment_and_modelname_for_oftendeeprl
 from legible.evaluate_policy import setup_shield
-from legible.create_rules_pacman import string_to_rule
-from legible.rule_learning.util import load_model
 from legible.feature_and_rule_learn import get_features_and_failure_indication
 from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from pacman_helper_asp import PacmanViolationClingoHelper
-import sys, logging, torch
+import sys, logging
 import check_norms
 import copy
 from collections import deque 
@@ -17,19 +14,7 @@ from collections import deque
 log = logging.getLogger(__name__)
 
 def setup(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
-
-    env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
-                                                                                    cfg.env.level, config_str, 
-                                                                                    cfg.training.steps_initial, cfg.training.steps_norm,
-                                                                                    cfg.training.feature_extractor)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_actions = env.action_space.n
-    action_tensor = torch.tensor(range(num_actions), device=device)
-
-    model_number = get_model_number(cfg)
-    model = load_model(model_path + f"_{model_number}","norm_guided_dqn",env=env,exact_match=True)
+    env, model, model_name, action_tensor = setup_model(cfg)
     shield_number = get_shield_number(cfg)
 
     #TODO what is difference between uncorr and improved?
@@ -39,18 +24,8 @@ def setup(cfg):
     if shield is None:
         sys.exit("Could not load shield, check if it exists.")
 
-    obs, info = env.reset()
-    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    features = feature_extractor.getFeatures(env.unwrapped.game.state,None)
-    ordered_features = sorted(list(features.items()),key=lambda x: x[0])
-
-    feature_to_index = {
-        name: idx for idx, name in enumerate(features)
-    }
-    ordered_feature_indices = [feature_to_index[fv[0]] for fv in ordered_features]
-
-    shield.feature_indices = ordered_feature_indices
-    shield, rule_chooser = set_rules(shield)
+    order_feature_indices(shield, env, cfg.rules.feature_extractor)
+    rule_chooser = set_rules(shield)
     assert hasattr(shield, 'enforceable_rules')
     assert hasattr(shield, 'cancelable_rules')
 
