@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "main"
+version = "0.1.0"
+description = "This project aims to ensure that RL-agents trained on norms in fact do adhere to them using ASP-planning and symbolic rules."
+readme = "../README.md"
+authors = ["Marit Einböck"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+hydra-core = "^1.3"
+legible = { path = "../legible", develop = true }
+oftendeeprl = { path = "../OFTEN-DeepRL", develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+

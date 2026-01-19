@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "oftendeeprl"
+version = "1.0.0"
+description = "Code of the project OFTEN-DeepRL from 'OFTEN-DeepRL: On-the-Fly Teaching of Ethical Norms to Deep Reinforcement Learning Agents' (Ignacio D. Lopez-Miguel, Sebastian Adam, Ezio Bartocci, Thomas Eiter, and Martin Tappler, ECAI, 2025). It implements an approach to teach RL-agents ethical norms."
+authors = ["Ignacio D. Lopez{-}Miguel, Sebastian Adam, Ezio Bartocci, Thomas Eiter, Martin Tappler"]
+packages = [
+    { include = "oftendeeprl", from = "src" },
+    { include = "gym_pacman", from = "src/oftendeeprl" }
+    ]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+hydra-core = "^1.3"
+gymnasium = "1.1.1"
+torch = "2.6.0"
+stable_baselines3 = "2.6.0"
+tensorboard = "2.19.0"
+clingo = "5.7.1"
+
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

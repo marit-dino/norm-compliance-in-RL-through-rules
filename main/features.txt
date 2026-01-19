@@ -1,0 +1,81 @@
+f0: x
+f1: y
+f2: poss-dir-0
+f3: poss-dir-1
+f4: poss-dir-2
+f5: poss-dir-3
+f6: #-of-ghosts-1-step-away
+f7: #-of-scared-ghosts-1-step-away
+f8: ghost-0-scared
+f9: ghost-0-scaredtime
+f10: ghost-0-x
+f11: ghost-0-y
+f12: ghost-0-dist
+f13: ghost-0-dir-0
+f14: ghost-0-dir-1
+f15: ghost-0-dir-2
+f16: ghost-0-dir-3
+f17: ghost-0-heading-0
+f18: ghost-0-heading-1
+f19: ghost-0-heading-2
+f20: ghost-0-heading-3
+f21: ghost-0-angle-0
+f22: ghost-0-angle-1
+f23: ghost-0-angle-2
+f24: ghost-0-angle-3
+f25: ghost-0-angle-4
+f26: ghost-0-angle-5
+f27: ghost-0-angle-6
+f28: ghost-0-angle-7
+f29: ghost-0-angle-8
+f30: ghost-1-scared
+f31: ghost-1-scaredtime
+f32: ghost-1-x
+f33: ghost-1-y
+f34: ghost-1-dist
+f35: ghost-1-dir-0
+f36: ghost-1-dir-1
+f37: ghost-1-dir-2
+f38: ghost-1-dir-3
+f39: ghost-1-heading-0
+f40: ghost-1-heading-1
+f41: ghost-1-heading-2
+f42: ghost-1-heading-3
+f43: ghost-1-angle-0
+f44: ghost-1-angle-1
+f45: ghost-1-angle-2
+f46: ghost-1-angle-3
+f47: ghost-1-angle-4
+f48: ghost-1-angle-5
+f49: ghost-1-angle-6
+f50: ghost-1-angle-7
+f51: ghost-1-angle-8
+f52: closest-capsule-dist
+f53: closest-capsule-dir-0
+f54: closest-capsule-dir-1
+f55: closest-capsule-dir-2
+f56: closest-capsule-dir-3
+f57: closest-food
+f58: closest-food-dir-0
+f59: closest-food-dir-1
+f60: closest-food-dir-2
+f61: closest-food-dir-3
+
+actions/direction:
+0: north
+1: south
+2: east
+3: west
+
+angles:
+0: ghost is basically "on" pacman
+1: north
+2: north-east
+3: east
+4: south-east
+5: south
+6: south-west
+7: west
+8: north-west
+
+direction: direction for distance

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "legible"
+version = "1.0.0"
+description = "This project is from 'Rule-Guided Reinforcement Learning Policy Evaluation and Improvement.' (IJCAI, 2025), it aims to improve the performance of RL-agents using symbolic knowledge."
+authors = ["Martin Tappler, Ignacio D. Lopez-Miguel, Sebastian Tschiatschek, and Ezio Bartocci"]
+packages = [{ include = "legible", from = "src" },
+            { include = "rule_learning", from = "src/legible" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+hydra-core = "^1.3"
+scikit-learn = "1.6.1"
+lime = "0.2.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
