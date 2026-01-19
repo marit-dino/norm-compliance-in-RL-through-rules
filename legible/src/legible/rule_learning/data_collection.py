@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch as tc
 from stable_baselines3.common.buffers import RolloutBuffer
+from gym_pacman_rules.envs.featureExtractors import ExtendedExtractor8, ExtendedExtractor6, ExtendedExtractor7, ExtendedExtractor9, DeepRLCompleteExtractor
+
 
 from rule_learning.util import save_pickle, load_pickle
 
@@ -19,7 +21,7 @@ class EpisodeData:
     rewards : list
 
 
-def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
+def generate_episode_data(env, model, algo_name, action_tensor, feature_extractor) -> EpisodeData:
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -34,13 +36,13 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
         raise Exception("Unsupported")
 
     data = EpisodeData([],[], [],[],[])
-    data.obs.append(obs)
     data.act_logits.append(act_logits)
     data.est_values.append(estimated_value)
+    feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=None))
     while True:
         action, _states = model.predict(obs)
         obs, reward, term, trunc, info = env.step(action)
-
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
 
@@ -55,7 +57,7 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
         data.est_values.append(estimated_value)
         data.act_logits.append(act_logits)
         data.actions.append(action)
-        data.obs.append(obs)
+        data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=action))
         if term and reward <= 0:
             data.rewards.append(min(-1,reward))
         else:
@@ -65,7 +67,7 @@ def generate_episode_data(env, model, algo_name, action_tensor) -> EpisodeData:
 
     return data
 
-def collect_eps_data_for_rules(nr_eps,env,model,algo_name,action_tensor,model_name,try_load=True, relearn=False):
+def collect_eps_data_for_rules(nr_eps,env,model,algo_name,action_tensor,model_name,feature_extractor,try_load=True, relearn=False):
     print(f"Going to collect {nr_eps} episodes")
     pickle_f_name = f"pickles/episodes/{model_name}_{nr_eps}{'_relearn' if relearn else ''}"
     if try_load:
@@ -81,7 +83,7 @@ def collect_eps_data_for_rules(nr_eps,env,model,algo_name,action_tensor,model_na
         eps_data = []
         for i in range(nr_eps):
             print(f"Episode {i}")
-            episode_data = generate_episode_data(env,model,algo_name,action_tensor)
+            episode_data = generate_episode_data(env,model,algo_name,action_tensor,feature_extractor)
             eps_data.append(episode_data)
         save_pickle(pickle_f_name,eps_data)
     return eps_data
@@ -153,7 +155,7 @@ def is_in_failure_neighborhood(pos, single_eps_data, neighborhood_size, failure_
                 for (obs_s,reward_s) in neighborhood])
 
 
-def get_obs_data_from_eps(eps_data, nr_data_points, failure_neighborhood = -1,
+def get_obs_data_from_eps(env, eps_data, nr_data_points, failure_neighborhood = -1,
                           failure_indicator = None,
                           act_probs_for_label=False,
                           return_all=False):
@@ -170,7 +172,7 @@ def get_obs_data_from_eps(eps_data, nr_data_points, failure_neighborhood = -1,
                 act_logits = e.act_logits[i]
                 act_logit_data.append(act_logits.cpu().numpy())
                 obs = e.obs[i]
-                obs_flat = obs.flatten()
+                obs_flat = np.array([obs[j] for j in obs.keys()])
                 value = e.est_values[i] if isinstance(e.est_values[i],float) else e.est_values[i].item()
                 if act_probs_for_label:
                     label = tc.softmax(act_logits,0)
@@ -218,3 +220,15 @@ def extract_actionwise_min_q(obs_data, q_val_calculator):
     obs_index_for_action = {k : np.array(v) for k,v in obs_index_for_action.items()}
 
     return obs_index_for_action
+
+def get_feature_extractor(feature_extractor, height, width):
+    if feature_extractor == "extended-6":
+        return ExtendedExtractor6(height=height,width=width)
+    elif feature_extractor == "extended-7":
+        return ExtendedExtractor7(height=height,width=width)
+    elif feature_extractor == "extended-8":
+        return ExtendedExtractor8(height=height,width=width)
+    elif feature_extractor == "extended-9":
+        return ExtendedExtractor9(height=height,width=width)
+    elif feature_extractor == "complete" :
+        return DeepRLCompleteExtractor(height=height, width=width)

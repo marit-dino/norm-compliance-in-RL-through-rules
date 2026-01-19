@@ -34,7 +34,7 @@ class RuleBody:
         return hash(self.conditions)
 
     def __str__(self):
-        return ",".join(map(str,self.conditions))
+        return ", ".join(map(str,self.conditions))
 
 
 class RuleHead:
@@ -54,10 +54,11 @@ class RuleHead:
 
 
 class Rule:
-    def __init__(self, polarity : bool,rule_head : RuleHead, rule_body : RuleBody):
+    def __init__(self, polarity : bool,rule_head : RuleHead, rule_body : RuleBody, mined = True):
         self.polarity = polarity
         self.rule_head = rule_head
         self.rule_body = rule_body
+        self.mined = mined
 
     def __eq__(self, other):
         if isinstance(other, Rule):
@@ -72,6 +73,11 @@ class Rule:
         mutated_body_conds = list(copy.deepcopy(self.rule_body.conditions))
         mutated_body_conds.append(Fact(feature,feature_valuation))
         return Rule(self.polarity,self.rule_head, RuleBody(mutated_body_conds))
+    
+    def remove_feature(self,feature,feature_valuation):
+        mutated_body_conds = list(copy.deepcopy(self.rule_body.conditions))
+        mutated_body_conds.remove(Fact(feature,feature_valuation))
+        return Rule(self.polarity,self.rule_head, RuleBody(mutated_body_conds))
 
     def __str__(self):
         rule_str_start = "-" if not self.polarity else ""
@@ -83,7 +89,7 @@ def parse_body_string(body_str) -> RuleBody:
     body = []
     for cond_str in body_str_split:
         cond_str = cond_str.strip()
-        cond_matcher = re.match(r'f(\d+)\((\d+)\)',cond_str)
+        cond_matcher = re.match(r'f(\d+)\((-?\d+)\)',cond_str)
         if cond_matcher is None:
             print(cond_str)
         matched_groups = cond_matcher.groups()
@@ -93,7 +99,7 @@ def parse_body_string(body_str) -> RuleBody:
     return RuleBody(body)
 
 
-def string_to_rule(rule_string : str) -> Rule :
+def string_to_rule(rule_string : str, mined = False) -> Rule :
     polarity = False if rule_string.startswith("-") else True
     if not polarity:
         rule_string = rule_string[1:]
@@ -103,7 +109,7 @@ def string_to_rule(rule_string : str) -> Rule :
     head_match = re.search(r"\d+", head_str)
     action = int(head_match.group())
     body = parse_body_string(body_str)
-    return Rule(polarity,RuleHead(action),body)
+    return Rule(polarity,RuleHead(action),body, mined)
 
 
 def contains_fact(rule : Rule, feature, feature_valuation):

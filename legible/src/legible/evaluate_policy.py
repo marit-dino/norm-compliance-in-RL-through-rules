@@ -3,7 +3,8 @@ import math
 import statistics
 import sys
 import time
-import highway_env
+import numpy as np
+#import highway_env
 import gym_pacman_rules
 import torch
 from torch.distributions import Categorical
@@ -11,6 +12,15 @@ from torch.distributions import Categorical
 from rule_learning.util import load_pickle, load_model, save_pickle
 from env_util import create_environment_and_modelname
 from shield.shields import AspShield, RuleChooser, RandomShield
+from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
+from rule_util import RuleSnapshot
+import copy, logging
+from collections import deque 
+
+
+log = logging.getLogger(__name__)
+
+
 
 
 def find_top_k_indices(base_model_name, top_string, return_rew = False):
@@ -29,23 +39,32 @@ def find_top_k_indices(base_model_name, top_string, return_rew = False):
 
 
 class EvalStats:
-    def __init__(self,all_rews,action_changes_list,wins):
+    def __init__(self,all_rews,action_changes_list,action_changes_updated_list,wins,all_violations):
         self.all_rews = all_rews
         self.action_changes = action_changes_list
+        self.action_changes_updated_list = action_changes_updated_list
         self.cum_rews = []
+        self.cum_violations = all_violations
         self.steps =[]
         nr_eps = len(self.all_rews)
+        self.action_changes_relation = []
+        for i, ac in enumerate(action_changes_list):
+            self.action_changes_relation.append(action_changes_updated_list[i]/ac)
         for rewards in all_rews:
             cum_rew = sum(rewards)
             nr_steps = len(rewards)
             self.cum_rews.append(cum_rew)
             self.steps.append(nr_steps)
         self.avg_rew = statistics.mean(self.cum_rews)
+        self.avg_violations = statistics.mean(self.cum_violations)
         self.avg_steps = statistics.mean(self.steps)
         self.avg_action_changes = statistics.mean(action_changes_list)
+        self.avg_action_changes_relation = statistics.mean(self.action_changes_relation)
         self.stderr_rew = statistics.stdev(self.cum_rews) / math.sqrt(nr_eps)
+        self.stderr_violations = statistics.stdev(self.cum_violations) / math.sqrt(nr_eps)
         self.stderr_steps = statistics.stdev(self.steps) / math.sqrt(nr_eps)
         self.stderr_action_changes = statistics.stdev(action_changes_list) / math.sqrt(nr_eps)
+        self.stderr_action_changes_relation = statistics.stdev(self.action_changes_relation) / math.sqrt(nr_eps)
         self.wins = wins
         self.nr_wins = sum(wins)
 
@@ -58,7 +77,7 @@ def create_rule_string_for_pos_neg(shield,shield_rule_nrs):
             rule_string += shield.neg_rules_list[shield_rule_nr - len(shield.pos_rules_list)] + "\n"
     return rule_string
 
-def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,action_tensor,last_action, change_type):
+def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,action_tensor,triggered_rules, change_type):
     if change_type == "favor_cancel":
         if len(neg_triggered) == 0:
             change_type = "rule_action"
@@ -70,14 +89,19 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         else:
             change_type = "cancel"
 
+    (pos_triggered_rules, neg_triggered_rules) = triggered_rules
+    pos_triggered_created_rules = list(filter(lambda r : not r[0].mined, pos_triggered_rules))
+    neg_triggered_created_rules = list(filter(lambda r : not r[0].mined, neg_triggered_rules))
+
     if "rule_action" in change_type:
         if action == pos_triggered:
-            return None # signal no change
+            return None, [] # signal no change
         else:
-            return  pos_triggered
+            corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action == pos_triggered, pos_triggered_created_rules))
+            return pos_triggered, corresponding_triggered_rules
     elif "cancel" == change_type:
         if len(neg_triggered) == 0:
-            return None
+            return None, []
         if algo_name == "ppo":
             for rule_action in neg_triggered:
                 act_logits[rule_action] = -1e6
@@ -92,12 +116,13 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
             if len(neg_triggered) < action_tensor.shape[0]:
                 for rule_action in neg_triggered:
                     act_logits[rule_action] = -1e6
-            return torch.argmax(act_logits)
+            corresponding_triggered_rules = list(filter(lambda r : r[0].rule_head.action in neg_triggered, neg_triggered_created_rules))
+            return torch.argmax(act_logits).item(), corresponding_triggered_rules
     else:
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = None,rule_chooser = None,change_type=None):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -106,7 +131,17 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
     rewards = []
     use_rule = shield is not None
     action_changes = 0
-    last_action = None
+    action_changes_due_updated_rules = 0
+    total_violations = 0
+    last_n_states = deque(maxlen=horizon)
+    last_n_triggered_rules = deque(maxlen=horizon)
+    last_n_triggered_rules.append([])
+
+
+    rules_snapshot = RuleSnapshot(
+        enforceable_rules = shield.enforceable_rules,
+        cancelable_rules = shield.cancelable_rules,
+    )
     while True:
         if algo_name == "ppo":
             action, _states = model.predict(obs)
@@ -120,53 +155,79 @@ def eval_single_eps(env, algo_name,model,action_tensor, shield : AspShield = Non
             raise Exception("Unsupported")
         if use_rule:
             obs_flat = obs.flatten()
-            triggers,triggered= shield.does_rule_trigger(obs_flat,rule_chooser)
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
+            triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
+            if triggered_rules == None:
+                triggered_rules = []
+            last_n_triggered_rules.append(triggered_rules)
             if triggers:
                 (pos_triggered, neg_triggered) = triggered
-                changed_action = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
-                                               last_action,change_type=change_type)
+                changed_action, activated_created_rules = change_action(action,pos_triggered,neg_triggered,algo_name,act_logits, action_tensor,
+                                               triggered_rules=triggered_rules, change_type=change_type)
                 if changed_action is not None:
                     action_changes += 1
                     action = changed_action
+                    if len(activated_created_rules) > 0:
+                        action_changes_due_updated_rules += 1
+
 
         obs, reward, term, trunc, info = env.step(action)
+        last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
 
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
-        last_action = action
         rewards.append(reward)
+
+        if violation_check != None:
+            tmp_violations = violation_check(env.unwrapped.game.state)
+            if tmp_violations > 0:
+                total_violations += tmp_violations
+                for j, state in enumerate(last_n_states):
+                    if horizon - j - 1 != 0: 
+                        log.info(
+                            f"{horizon - j - 1} step(s) before violation:\n{state}\n"
+                            f"triggered rules:\n\t"
+                            f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
+                        )
+                    else:
+                        log.info(
+                            f"violation:\n{state}\n"
+                        )
+    
         if term and reward > 0:
             win = True # TODO check if true for all environments
         if term or trunc:
             break
 
-    return win, rewards, action_changes
+
+    return win, rewards, action_changes, action_changes_due_updated_rules, total_violations
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,rule_string = '',shield = None,rule_chooser = None, change_type = None):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
+    action_changes_updated_list = []
 
-    print(f"Evaluation: {rule_string}" )
+    if rule_string != '':
+        print(f"Evaluation: {rule_string}" )
     all_rews = []
     wins = []
+    all_violations = []
     for i in range(nr_eps):
-        win, rewards,action_changes = eval_single_eps(env,algo_name,model,action_tensor,shield,rule_chooser,change_type)
+        win,rewards,action_changes,action_changes_updated,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,shield,rule_chooser,change_type,violation_check)
         wins.append(win)
         all_rews.append(rewards)
+        all_violations.append(violations)
         action_changes_list.append(action_changes)
+        action_changes_updated_list.append(action_changes_updated)
 
-    eval_stats = EvalStats(all_rews,action_changes_list,wins)
-    print(f"Nr. wins: {eval_stats.nr_wins}")
-    print(f"Avg. reward: {eval_stats.avg_rew} with SE {eval_stats.stderr_rew}")
-    print(f"Avg. steps: {eval_stats.avg_steps} with SE {eval_stats.stderr_steps}")
-    print(f"Avg. action changes: {eval_stats.avg_action_changes} with SE {eval_stats.stderr_action_changes}")
+    eval_stats = EvalStats(all_rews,action_changes_list,action_changes_updated_list,wins,all_violations)
     return eval_stats
 
 
-def setup_shield(env_name,mode,steps,shield_feat,improved,random_shield,
-                 exact_model_number = None, algo_name = "dqn"):
+def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
+                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False, horizon="", radius=""):
     if improved:
         shield_type = "improved"
     else:
@@ -175,14 +236,18 @@ def setup_shield(env_name,mode,steps,shield_feat,improved,random_shield,
     if random_shield:
         shield_type = "random"
 
-    shield_name = f"pickles/shields/{shield_type}/" \
-                  f"{algo_name}_{env_name.replace('/', '_')}_{mode}_feat_{shield_feat}_{steps}_shield"
-
+    if steps_norm == 0:
+        shield_name = f"pickles/shields/{shield_type}/" \
+                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_shield"
+    else:
+        shield_name = f"pickles/shields/{shield_type}/" \
+                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
+    
     if exact_model_number is None:
         shield = load_pickle(shield_name)
     else:
         shield_name = f"{shield_name}_{exact_model_number}.pkl"
-        shield = load_pickle(shield_name,  exact_match=True)
+        shield = load_pickle(shield_name, exact_match=True)
     return shield
 
 
@@ -400,6 +465,7 @@ if __name__ == "__main__":
             rule_nr = split_str[1]
             change_type = split_str[2]
             shield_rule = (shield_feat,rule_nr,change_type)
+            print(shield_rule)
         if "--ext" in arg:
             ext_to = int(arg.replace("--ext",""))
         if "--exact_mod" in arg:

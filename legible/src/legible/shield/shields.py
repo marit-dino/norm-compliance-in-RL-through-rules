@@ -4,6 +4,10 @@ from abc import ABC, abstractmethod
 import clingo
 
 from rule_learning.learnRules import replace_single_cont_value
+<<<<<<< HEAD
+=======
+from shield.rule_classes import string_to_rule
+>>>>>>> 55359bfd3d89422eba883987115f3bdfa56e169a
 
 def getModels(generation, rules, constraint, obs):
     """
@@ -42,28 +46,31 @@ class RuleChooser:
         self.shield = shield
         self.rules_list = None
 
-    def select_rules(self, rules_list_para, return_keys=False):
+    def select_rules(self, rules_snapshot, return_keys=False):
+        sorted_enforce_rules = sorted(rules_snapshot.enforceable_rules.keys())
+        sorted_cancel_rules = sorted(rules_snapshot.cancelable_rules.keys())
         selected = []
-        rule_keys = []
-        for rule_index in rules_list_para:
-            if rule_index < len(self.sorted_enforce_rules):
-                rule_key = self.sorted_enforce_rules[rule_index]
+        rule_keys = []       
+        for rule_index in rules_snapshot.rule_indices:
+            if rule_index < len(sorted_enforce_rules):
+                rule_key = sorted_enforce_rules[rule_index]
                 rule_keys.append(rule_key)
-                selected.extend(self.shield.enforceable_rules[rule_key])
+                selected.extend(rules_snapshot.enforceable_rules[rule_key])
             else:
-                rule_key = self.sorted_cancel_rules[rule_index - len(self.sorted_enforce_rules)]
+                rule_key = sorted_cancel_rules[rule_index - len(sorted_enforce_rules)]
                 rule_keys.append(rule_key)
-                selected.extend(self.shield.cancelable_rules[rule_key])
+                selected.extend(rules_snapshot.cancelable_rules[rule_key])
         if return_keys:
             return selected, rule_keys
         else:
             return selected
+        
     def set_rules_list(self,rules_list):
         self.rules_list = rules_list
-    def choose_rules(self):
+    def choose_rules(self,rules_snapshot):
         if self.rules_list is None:
             raise Exception("Rules list is not set")
-        return self.select_rules(self.rules_list)
+        return self.select_rules(rules_snapshot)
 
 # copied from asp shield
 def discretize(fvs, feature_indices, categorical_features, feature_intervals):
@@ -107,7 +114,7 @@ class NoopShield(Shield):
 class AspShield(Shield):
     def __init__(self,num_actions,feature_indices,feature_names,neg_rules,pos_rules,
                  feature_intervals,
-                 categorical_features):
+                 categorical_features,enforceable_rules = None, cancelable_rules = None):
         self.actions = list(range(num_actions))
         self.feature_indices = feature_indices
         self.feature_names = feature_names
@@ -121,44 +128,87 @@ class AspShield(Shield):
         self.feature_intervals = feature_intervals
         self.categorical_features = categorical_features
         self.nr_rules = len(self.pos_rules_list) + len(self.neg_rules_list)
+        self.enforceable_rules = enforceable_rules
+        self.cancelable_rules = cancelable_rules
 
-    def get_trigger_action(self, rules,facts):
+
+    def add_neg_rule(self, rule):
+        self.all_neg_rules += f"\n{str(rule)}"
+        self.neg_rules_list.append(str(rule))
+        self.nr_rules += 1  
+
+    def remove_neg_rule(self, rule_str):
+        neg_rules_list_copy = self.neg_rules_list.copy()
+        neg_rules_list_copy = [r for r in neg_rules_list_copy if rule_str != str(string_to_rule(r))]
+        self.all_neg_rules = "\n".join(neg_rules_list_copy)
+        self.neg_rules_list = neg_rules_list_copy
+        self.nr_rules -= 1
+
+    def add_pos_rule(self, rule):
+        self.all_pos_rules += f"\n{str(rule)}"
+        self.pos_rules_list.append(str(rule))
+        self.nr_rules += 1
+
+    def remove_pos_rule(self, rule_str):
+        pos_rules_list_copy = self.pos_rules_list.copy()
+        pos_rules_list_copy = [r for r in pos_rules_list_copy if rule_str != str(string_to_rule(r))]
+        self.all_pos_rules = "\n".join(pos_rules_list_copy)
+        self.pos_rules_list = pos_rules_list_copy
+        self.nr_rules -= 1
+
+    def get_trigger_action(self, rules, facts, original_rules):
         if len(rules) == 0:
-            return []
+            return [], []
         res = getModels(generation="",
                         rules="\n".join(rules),
                         constraint="",
                         obs=" ".join(facts))
 
         if len(res) == 0:
-            return []
+            return [], []
         else:
-            triggered_actions = [int(str(item.arguments[0])) for item in res[0] if (item.name == "action")]
-            triggered_actions = list(set(triggered_actions))
-            return triggered_actions
+            triggered_actions_rules = [item.arguments for item in res[0] if (item.name == "triggered_by")]
+            triggered_actions = list(set([int(str(item[1])) for item in triggered_actions_rules]))
+            triggered_actions_rules = [self.transform_triggered_rule(rule_action, rules, original_rules) for rule_action in triggered_actions_rules]
+            return triggered_actions, triggered_actions_rules
 
-    def does_rule_trigger(self,obs, rule_chooser : RuleChooser):
-        features = self.raw_features(obs)
+    def transform_rule(self, rule, i):
+        action = rule.rpartition("action(")[2].split(")")[0]
+        ret1 = f"{rule.strip('.')}, triggered_by({i}, {action})."
+        ret2 = f"triggered_by({i}, {action}){rule.strip(f'-action({action})')}"
+        return ret1, ret2
+    
+    def transform_triggered_rule(self, rule_action, rules, original_rules):
+        triggered_str = f", triggered_by({rule_action[0]}, {rule_action[1]})."
+        rule_str = list(filter(lambda r: r.endswith(triggered_str), rules))[0].rsplit(triggered_str)[0] + "."
+        from shield.rule_classes import string_to_rule
+        # conversion to rule changes the order of the featuers, so "original_rules[rule_str]" does not work
+        return list(filter(lambda r: r[0] == (string_to_rule(rule_str)), original_rules.values()))[0]
+
+
+    def does_rule_trigger(self,obs, rule_chooser : RuleChooser, rules_snapshot):
+        features = self.raw_features(obs)   
         facts = self.raw_features_into_facts(features)
 
-        rules = rule_chooser.choose_rules()
-        pos_rules = [r for r in rules if r.startswith("action")]
-        neg_rules = [r for r in rules if r.startswith("-action")]
-        pos_triggered = self.get_trigger_action(pos_rules, facts)
-        neg_triggered = self.get_trigger_action(neg_rules, facts)
+        rules = rule_chooser.choose_rules(rules_snapshot)
+        pos_rules = [rt for i, r in enumerate(rules) if str(r).startswith("action") for rt in self.transform_rule(str(r), i)]
+        neg_rules = [rt for i, r in enumerate(rules) if str(r).startswith("-action") for rt in self.transform_rule(str(r), i)]
+
+        pos_triggered, pos_rules_triggered = self.get_trigger_action(pos_rules, facts, rules_snapshot.enforceable_rules)
+        neg_triggered, neg_rules_triggered = self.get_trigger_action(neg_rules, facts, rules_snapshot.cancelable_rules)
         if len(pos_triggered) == 0 and len(neg_triggered) == 0:
-            return False, None
+            return False, None, None
 
         # check for conflicts
         # if two positive actions trigger at the same time, just return negative, or do nothing?
         if len(pos_triggered) > 1:
-            return False, (None,neg_triggered)
+            return False, (None,neg_triggered), (pos_rules_triggered, neg_rules_triggered)
         # check for conflicts between negative and positive triggers
         for pos_action in pos_triggered:
             if pos_action in neg_triggered:
-                return False, None
+                return False, None, (pos_rules_triggered, neg_rules_triggered)
         # there can only be one positive
-        return True,(pos_triggered[0] if pos_triggered else None,neg_triggered)
+        return True,(pos_triggered[0] if pos_triggered else None,neg_triggered), (pos_rules_triggered, neg_rules_triggered)
 
     def get_blocked_actions(self, state):
         features = self.raw_features(state)
@@ -175,24 +225,24 @@ class AspShield(Shield):
         neg_actions = [int(str(item.arguments[0])) for item in res[0] if (
                 item.name == "action") and (not item.positive)]
         neg_actions.sort()
-        if neg_actions == self.actions:
-            print("Tried to block all actions, blocking none")
-            return []
-        # print(neg_actions)
+        # if neg_actions == self.actions:
+        #     # print("Tried to block all actions, blocking none")
+        #     return []
+        # # print(neg_actions)
         return neg_actions
 
     def discretize(self,fvs):
+        fvs = fvs.copy()
         for i,fi in enumerate(self.feature_indices):
-            if fi in self.categorical_features:
-                continue
-            else:
+            if fi not in self.categorical_features:
                 enum_interval = enumerate(self.feature_intervals[fi])
-                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval)
+                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) #replace_single_cont_value(fvs[i], fi, enum_interval) TODO can i do this?
         return fvs
 
-    def raw_features(self, state):
-        features_values = state[self.feature_indices]
+    def raw_features(self, obs):
+        features_values = obs.copy()
         features_values = self.discretize(features_values).astype(int)
+
         return features_values
 
     def raw_features_into_facts(self, features_values):

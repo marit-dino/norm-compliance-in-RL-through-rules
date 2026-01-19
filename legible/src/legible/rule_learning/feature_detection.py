@@ -488,7 +488,6 @@ def detect_features(env_name,data, model, nr_features, lime_test_size, action_te
     most_significant_features_prob_sum_grouped = get_grouped_values(
         most_significant_features_prob_sum, corr_vars)
 
-    print(len(most_signicant_features_grouped))
     detected_features = []
     feature_intervals = discretized_feature_names_to_intervals(all_discretized_feature_names, categorical_features)
     harmonize_similar_features(feature_intervals,groups_of_similar)

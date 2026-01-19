@@ -6,9 +6,12 @@ from oftendeeprl.extended_training import parse_level, setup_and_ext_train, get_
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def train_base_model(cfg : DictConfig) -> None:
     # train initial policy
-    policy_name = train_pacman(cfg.training.algorithm, cfg.env.name, cfg.training.steps_initial, cfg.env.level, cfg.env.feature_extractor)
+    policy_name = train_pacman(cfg.training.algorithm, cfg.env.name, cfg.training.steps_initial, cfg.env.level, cfg.training.feature_extractor)
     level = parse_level(cfg.env.name, cfg.env.level)
-    norm_descriptor, norm_helper = get_norm_helper(cfg.env.name, cfg.norms, cfg.env.level)
+
+    norm_descriptor = f"{'_'.join(cfg.norms)}"
+    argument_str = f"--norm{str(cfg.asp.horizon)}-{str(cfg.asp.radius)}-{norm_descriptor}"
+    norm_descriptor, norm_helper = get_norm_helper(cfg.env.name, argument_str, cfg.env.level)
     # train on norms
     model_number = policy_name.removesuffix(".zip").rsplit("_", 1)[-1]
     setup_and_ext_train(cfg.env.name, cfg.training.steps_initial, cfg.training.steps_norm, level, cfg.training.feature_extractor,

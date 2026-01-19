@@ -4,6 +4,7 @@ import torch
 from gymnasium.wrappers import TransformReward
 from stable_baselines3 import PPO, DQN
 from stable_baselines3.common.env_util import make_vec_env
+from gym_pacman_rules.envs.pacman_env import PacmanEnv
 
 from rule_learning.util import save_model
 
@@ -41,7 +42,7 @@ def train(env_name,algo,feature_extractor, n_steps,level, tb_name = None):
     return model
 
 
-def create_pacman_env(env_name,feature_extractor, level, render_mode,scale = False):
+def create_pacman_env(env_name,feature_extractor, level, render_mode,scale = False) -> PacmanEnv:
     env_name = env_name + "-legible"
     env = gym.make(env_name, layout=level,features=feature_extractor,render_mode=render_mode)
     if scale:

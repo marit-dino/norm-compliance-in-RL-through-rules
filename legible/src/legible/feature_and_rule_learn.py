@@ -3,10 +3,10 @@ import sys
 import gymnasium.spaces
 import numpy as np
 import torch
-from .rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
-from .rule_learning.feature_detection import detect_features, get_most_important_corr_features
-from .rule_learning.learnRules import extract_features_from_obs, get_rules
-from .rule_learning.util import save_pickle, load_model
+from rule_learning.data_collection import collect_eps_data_for_rules, get_obs_data_from_eps, extract_based_on_importance, extract_actionwise_min_q
+from rule_learning.feature_detection import detect_features, get_most_important_corr_features
+from rule_learning.learnRules import extract_features_from_obs, get_rules
+from rule_learning.util import save_pickle, load_model
 from legible.env_util import create_environment_and_modelname, create_environment_and_modelname_for_oftendeeprl
 
 from shield.shields import AspShield
@@ -66,6 +66,8 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                                     steps_norm = 0,
                                     norm_descriptor = "",
                                     feature_extractor_rules = "",
+                                    horizon = "",
+                                    radius = "",
                                     algorithm="ripper", min_acc=0.9, min_cov=0.01):
 
     # setup stuff
@@ -73,6 +75,9 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     # constant settings
     nr_exp_factor = 5
     failure_neighborhood = -1
+
+    if feature_extractor_rules == "":
+        feature_extractor_rules = feature_extractor
 
     if "norm_guided" in algo_name:
         env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl(algo_name, env_name, mode, norm_descriptor, steps_initial, steps_norm,
@@ -95,13 +100,13 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     actions_tensor = torch.tensor(range(num_actions), device=device)
 
     # data collection
-    eps_data = collect_eps_data_for_rules(nr_eps, env, model,algo_name, actions_tensor,model_name,
+    eps_data = collect_eps_data_for_rules(nr_eps, env, model,algo_name, actions_tensor,model_name,feature_extractor_rules,
                                           try_load=exact_model_number is None)
     nr_experiences = int(sum(len(d.obs) for d in eps_data) / nr_exp_factor)
     print(f"Going to select {nr_experiences} experiences")
-    all_obs_data, eps_data_array,_ = get_obs_data_from_eps(eps_data, nr_experiences,
+    all_obs_data, eps_data_array,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                          return_all=True)
-    all_obs_data_failure, eps_data_array_failure,_ = get_obs_data_from_eps(eps_data, nr_experiences,
+    all_obs_data_failure, eps_data_array_failure,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                                            failure_neighborhood=failure_neighborhood,
                                                                            failure_indicator=failure_indicator,
                                                          return_all=True)
@@ -161,7 +166,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                        feature_intervals, categorical_features)
 
     shield_name = f"pickles/shields/{'corr'if corr else 'uncorr'}/"\
-                  f"{algo_name}_{env_name.replace('/','_')}_{mode}_feat_{nr_features}_{steps_initial}_to_{steps_norm}_shield"
+                  f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{nr_features}_{steps_initial}_to_{steps_norm}_shield"
 
     if exact_model_number is None:
         save_pickle(shield_name,shield)
