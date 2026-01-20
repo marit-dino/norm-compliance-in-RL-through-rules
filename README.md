@@ -16,6 +16,9 @@ Open tasks:
     - [x] check why "nothing to update" does not occur anymore
 - [ ] documentation/comments
 - [ ] add more complex norms
+  - [x] add to norm check 
+  - [ ] often deep rl
+  - [ ] add feature to features of rules
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

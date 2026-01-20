@@ -7,8 +7,10 @@
 #external goutside(G) : G=0..ghosts-1.
 #external wall(C,R) : C=-radius..radius, R=-radius..radius.
 #external num_violations(N) : N=1..num_norms*max_horizon.
-#external horizon(N) : N=1..max_horizon-1.
+#external dynamic_horizon(N) : N=1..max_horizon.
+#external eaten_ghost.
 
+horizon(H) :- H=1..N-1, dynamic_horizon(N).
 
 % player always starts at the 0 position
 pcol(0,0).
@@ -60,12 +62,13 @@ ok(T,G) :- ok(T,G,0), ok(T,G,1).
 ok(T,G) :- goutside(G), horizon(T).
 good(T,G) | bad(T,G) :- G=0..ghosts-1, horizon(T).
 ok(T,G) :- bad(T,G).
+ok(T,G) :- eaten_ghost, G=0..ghosts-1, horizon(T).
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
 
 % penalty for violating the norm of eating a ghost
 penalty(P, T) :- P = H - T, bad(T,F), horizon(H).
 
-:- V = #sum{1, T, G : bad(T,G), T=0..maxhorizon-1, G=0..ghosts-1}, V >= N, num_violations(N).
+:- V = #sum{1, T, G : bad(T,G), T=0..H-1, dynamic_horizon(H), G=0..ghosts-1}, V >= N, num_violations(N).
 
 #show pcol/2.
 #show prow/2.

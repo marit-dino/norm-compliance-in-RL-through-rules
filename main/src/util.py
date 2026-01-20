@@ -8,7 +8,9 @@ import torch
 
 
 def get_model_number(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
+    #TODO undo
+    #norm_descriptor = f"{'_'.join(cfg.norms)}"
+    norm_descriptor = f"{cfg.norms[0]}"
     config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
 
     if cfg.rules.model_number is None:
@@ -16,7 +18,7 @@ def get_model_number(cfg):
         norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
                             and f.startswith(model_name)]
         if len(norm_guided_models) == 0:
-            sys.exit("No policy found that matches the provided parameters.")
+            sys.exit(f"No policy found that matches the provided parameters: {model_name}")
         return sorted(norm_guided_models)[-1].removesuffix(".zip").rsplit("_", 1)[-1]
     else: 
        return cfg.rules.model_number
@@ -26,14 +28,16 @@ def get_shield_number(cfg):
         shield_name = f"norm_guided_dqn_{cfg.env.name.replace('/', '_')}_{cfg.env.level}_{cfg.asp.horizon}_{cfg.asp.radius}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
         shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name) and not "updated" in f]
         if len(shields) == 0:
-            sys.exit("No shield found that matches the provided parameters.")
+            sys.exit(f"No shield found that matches the provided parameters: {shield_name}")
         return sorted(shields)[-1].removesuffix(".pkl").rsplit("_", 1)[-1]
     else: 
        return cfg.rules.shield_number
     
 
 def setup_model(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
+    #TODO undo
+    #norm_descriptor = f"{'_'.join(cfg.norms)}"
+    norm_descriptor = f"{cfg.norms[0]}"
     config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
 
     env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,

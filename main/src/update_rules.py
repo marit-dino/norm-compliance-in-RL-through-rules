@@ -76,10 +76,11 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
+            prev_eaten = env.unwrapped.has_eaten_ghost
             obs, reward, term, trunc, info = env.step(action)
             last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
             last_n_actions.append(action)
-            last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1]))
+            last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1], prev_eaten))
             prev_env_states.append(env.unwrapped.save_state())
 
             obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -87,22 +88,21 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if last_n_violations[-1] > 0:
                 less_violations_possible = []
-                last_n_states_copy = copy.deepcopy(last_n_states)
                 for j, state in enumerate(last_n_states):
-                    if cfg.asp.horizon - j - 1 != 0: 
+                    if j < cfg.asp.horizon - 1: 
                         log.info(
                             f"{cfg.asp.horizon - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
                             f"action: {last_n_actions[j+1]}"
                         )
+                        #TODO sum only over part of violations?
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(last_n_violations), cfg.asp.horizon-j, prev_env_states[j]["has_eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
-                    if j < cfg.asp.horizon and j > 0:
-                        less_violations_possible.append(asp_helper.less_violations_possible(last_n_states_copy.popleft(), sum(last_n_violations), cfg.asp.horizon-j))
-                
+    
                 if True in less_violations_possible:
                     prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
                     rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)

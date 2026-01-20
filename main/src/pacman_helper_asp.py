@@ -20,10 +20,11 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = "vegetarian" in norms
+        self.vegetarian = "vegetarian" in norms and not "vegan" in norms
+        self.permissive = True # TODO "permissive" in norms
 
 
-    def set_clingo_externals(self, state, num_violations, dynamic_horizon):
+    def set_clingo_externals(self, state, num_violations, dynamic_horizon, eaten_ghost_before):
             midpoint = state.getPacmanPosition()
 
             # walls
@@ -89,11 +90,17 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
             # number of violations
             self.ctl.assign_external(Function("num_violations", [Number(num_violations)]), True)
             # dynamic horizon
-            self.ctl.assign_external(Function("horizon", [Number(dynamic_horizon)]), True)
+            self.ctl.assign_external(Function("dynamic_horizon", [Number(dynamic_horizon)]), True)
+            # has already eaten a ghost before
+            if self.permissive:
+                self.ctl.assign_external(Function("eaten_ghost"), eaten_ghost_before)
+            else: 
+                self.ctl.assign_external(Function("eaten_ghost"), False)
+
 
             
 
-    def less_violations_possible(self, state, num_violations, dynamic_horizon):
+    def less_violations_possible(self, state, num_violations, dynamic_horizon,eaten_ghost_before):
 
         # Reset the clingo window
         self.reset_clingo_externals(state)
@@ -102,7 +109,7 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         # "Optimization-> Windowing" in the main document for more information)
         # Externals include cell information (walls, ghosts) as well as
         # information about policy preferences
-        self.set_clingo_externals(state, num_violations, dynamic_horizon)
+        self.set_clingo_externals(state, num_violations, dynamic_horizon,eaten_ghost_before)
 
         # solve the LP
         result = self.ctl.solve(on_model=self.on_model)

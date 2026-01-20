@@ -154,7 +154,6 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
         else:
             raise Exception("Unsupported")
         if use_rule:
-            obs_flat = obs.flatten()
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
             triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
             if triggered_rules == None:
@@ -173,7 +172,6 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
 
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
-
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
         rewards.append(reward)

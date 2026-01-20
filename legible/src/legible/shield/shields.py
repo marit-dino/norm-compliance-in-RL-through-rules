@@ -4,10 +4,7 @@ from abc import ABC, abstractmethod
 import clingo
 
 from rule_learning.learnRules import replace_single_cont_value
-<<<<<<< HEAD
-=======
 from shield.rule_classes import string_to_rule
->>>>>>> 55359bfd3d89422eba883987115f3bdfa56e169a
 
 def getModels(generation, rules, constraint, obs):
     """
