@@ -16,10 +16,12 @@ log = logging.getLogger(__name__)
 def setup(cfg):
     env, model, model_name, action_tensor = setup_model(cfg)
     shield_number = get_shield_number(cfg)
+    norms = f"{'_'.join(cfg.norms)}"
+    config_str = f"{norms}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     #TODO what is difference between uncorr and improved?
     shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", horizon=cfg.asp.horizon, radius=cfg.asp.radius)
+                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", norm_descriptor=config_str)
 
     if shield is None:
         sys.exit("Could not load shield, check if it exists.")
@@ -31,7 +33,7 @@ def setup(cfg):
 
     return env, model, action_tensor, shield, rule_chooser
 
-
+# 250
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon)
@@ -76,7 +78,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
-            prev_eaten = env.unwrapped.has_eaten_ghost
+            prev_eaten = env.unwrapped.game.state.data.eaten_ghost
             obs, reward, term, trunc, info = env.step(action)
             last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
             last_n_actions.append(action)
@@ -97,12 +99,13 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"action: {last_n_actions[j+1]}"
                         )
                         #TODO sum only over part of violations?
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(last_n_violations), cfg.asp.horizon-j, prev_env_states[j]["has_eaten_ghost"]))
+                        log.info(f"violations {sum(last_n_violations)}")
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(last_n_violations), cfg.asp.horizon-j, prev_env_states[j]["game_state"].data.eaten_ghost))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
-    
+                log.info(less_violations_possible)
                 if True in less_violations_possible:
                     prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
                     rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)

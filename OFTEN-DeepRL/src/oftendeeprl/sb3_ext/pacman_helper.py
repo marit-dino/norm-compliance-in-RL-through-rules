@@ -7,7 +7,7 @@ from sb3_ext.clingoHelper import ClingoHelper
 
 class PacmanClingoHelper(ClingoHelper):
 
-    def __init__(self, horizon, radius, ghosts, vegetarian):
+    def __init__(self, horizon, radius, ghosts, norm):
         self.ctl = clingo.Control(
             ["-c", f"horizon={horizon}",
              "-c", f"radius={radius}",
@@ -18,7 +18,9 @@ class PacmanClingoHelper(ClingoHelper):
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = vegetarian
+        self.vegetarian = "vegetarian" == norm
+        self.permissive = "permissive" == norm
+        self.vegan = "vegan" == norm
 
     def get_relevant_states(self, state,obs):
         return [(obs,"curr")]
@@ -97,8 +99,11 @@ class PacmanClingoHelper(ClingoHelper):
                     Number(-i),
                     Number(-j)
                 ]), False)
+        
+        self.ctl.assign_external(Function("eaten_ghost", []), False)
 
-    def set_clingo_externals(self, state, actionValuePairs):
+
+    def set_clingo_externals(self, state, actionValuePairs, eaten_ghost_before):
         midpoint = state.getPacmanPosition()
 
         # walls
@@ -182,8 +187,14 @@ class PacmanClingoHelper(ClingoHelper):
             self.ctl.assign_external(Function("action",
                                               [Number(a),
                                                Number(r)]), True)
+            
 
-    def get_action(self, state, actionValuePairs):
+        if self.permissive:
+            self.ctl.assign_external(Function("eaten_ghost", []), eaten_ghost_before)
+        else: 
+            self.ctl.assign_external(Function("eaten_ghost", []), False)
+
+    def get_action(self, state, actionValuePairs, eaten_ghost_before):
         self.next = None
         actionValuePairs = actionValuePairs["curr"]
 
@@ -194,7 +205,7 @@ class PacmanClingoHelper(ClingoHelper):
         # "Optimization-> Windowing" in the main document for more information)
         # Externals include cell information (walls, ghosts) as well as
         # information about policy preferences
-        self.set_clingo_externals(state, actionValuePairs)
+        self.set_clingo_externals(state, actionValuePairs, eaten_ghost_before)
 
         # solve the LP
         self.ctl.solve(on_model=self.on_model)

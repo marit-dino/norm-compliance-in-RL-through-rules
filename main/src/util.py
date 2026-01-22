@@ -8,9 +8,7 @@ import torch
 
 
 def get_model_number(cfg):
-    #TODO undo
-    #norm_descriptor = f"{'_'.join(cfg.norms)}"
-    norm_descriptor = f"{cfg.norms[0]}"
+    norm_descriptor = f"{'_'.join(cfg.norms)}"
     config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
 
     if cfg.rules.model_number is None:
@@ -35,8 +33,7 @@ def get_shield_number(cfg):
     
 
 def setup_model(cfg):
-    #TODO undo
-    #norm_descriptor = f"{'_'.join(cfg.norms)}"
+    norm_descriptor = f"{'_'.join(cfg.norms)}"
     norm_descriptor = f"{cfg.norms[0]}"
     config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
 

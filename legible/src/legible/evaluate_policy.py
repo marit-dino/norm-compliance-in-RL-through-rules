@@ -225,7 +225,7 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
 
 
 def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
-                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False, horizon="", radius=""):
+                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False, norm_descriptor = ""):
     if improved:
         shield_type = "improved"
     else:
@@ -236,10 +236,10 @@ def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
 
     if steps_norm == 0:
         shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_shield"
+                    f"{algo_name}_{env_name.replace('/','_')}_{mode}__{norm_descriptor}__feat_{shield_feat}_{steps_initial}_shield"
     else:
         shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
+                    f"{algo_name}_{env_name.replace('/','_')}_{mode}__{norm_descriptor}__feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
     
     if exact_model_number is None:
         shield = load_pickle(shield_name)

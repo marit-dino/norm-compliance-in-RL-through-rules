@@ -32,4 +32,4 @@ asp:
 eval:
   nr_episodes: 250
 
-norms: [vegetarian]
+norms: [permissive] 

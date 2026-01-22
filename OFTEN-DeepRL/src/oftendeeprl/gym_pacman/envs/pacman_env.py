@@ -181,6 +181,7 @@ class PacmanEnv(gymnasium.Env):
             # 'ghost_in_frame': [self.ghostInFrame],
             'step_counter': [[0]],
         }
+        self.initial_info['agent_eaten'] = self.game.state.data.agentEatenCnt
         return self.features.obs_from_state(self.game.state, None),self.initial_info
 
 

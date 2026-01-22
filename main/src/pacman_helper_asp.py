@@ -4,7 +4,9 @@ from clingo import Function, Number
 
 from sb3_ext.clingoHelper import ClingoHelper
 from oftendeeprl.sb3_ext.pacman_helper import PacmanClingoHelper
+import logging
 
+log = logging.getLogger(__name__)
 
 class PacmanViolationClingoHelper(PacmanClingoHelper):
 
@@ -20,9 +22,20 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = "vegetarian" in norms and not "vegan" in norms
-        self.permissive = True # TODO "permissive" in norms
+        self.vegetarian = "vegetarian" in norms
+        self.permissive = "permissive" in norms
+        self.num_norms = num_norms
+        self.horizon = horizon
 
+
+    def reset_clingo_externals(self, state):
+        for v in range(0, self.num_norms * self.horizon):
+            self.ctl.assign_external(Function("num_violations", [Number(v)]), False)
+        
+        for h in range(0, self.horizon):
+            self.ctl.assign_external(Function("dynamic_horizon", [Number(h)]), False)
+
+        return super().reset_clingo_externals(state)
 
     def set_clingo_externals(self, state, num_violations, dynamic_horizon, eaten_ghost_before):
             midpoint = state.getPacmanPosition()
@@ -90,12 +103,15 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
             # number of violations
             self.ctl.assign_external(Function("num_violations", [Number(num_violations)]), True)
             # dynamic horizon
+            log.info(f"setting dynamic horizon to {dynamic_horizon}")
+
             self.ctl.assign_external(Function("dynamic_horizon", [Number(dynamic_horizon)]), True)
             # has already eaten a ghost before
             if self.permissive:
-                self.ctl.assign_external(Function("eaten_ghost"), eaten_ghost_before)
+                log.info(f"setting eaten_ghost to {eaten_ghost_before}")
+                self.ctl.assign_external(Function("eaten_ghost", []), eaten_ghost_before)
             else: 
-                self.ctl.assign_external(Function("eaten_ghost"), False)
+                self.ctl.assign_external(Function("eaten_ghost", []), False)
 
 
             
@@ -113,5 +129,6 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
 
         # solve the LP
         result = self.ctl.solve(on_model=self.on_model)
+        log.info(self.next)
     
         return result.satisfiable

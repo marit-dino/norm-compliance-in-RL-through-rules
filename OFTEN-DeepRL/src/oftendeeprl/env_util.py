@@ -94,9 +94,9 @@ def get_norm_helper(env_name,arg, level):
         radius = int(split_str[1])
         vegetarian = "vegetarian" in split_str[2]
         ghosts = 4 if "original" in level else 2
-        norm_descriptor = "vegetarian" if vegetarian else "vegan"
+        norm_descriptor = split_str[-1]
         norm_descriptor += f"__{horizon}_{radius}"
-        norm_helper = PacmanClingoHelper(horizon, radius, ghosts, vegetarian=vegetarian)
+        norm_helper = PacmanClingoHelper(horizon, radius, ghosts, split_str[-1])
     elif "garden" in env_name:
         norm_tuple_str = arg.replace("--norm","")
         split_str = norm_tuple_str.split("-")

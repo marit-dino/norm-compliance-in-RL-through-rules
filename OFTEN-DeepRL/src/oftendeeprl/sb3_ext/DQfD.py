@@ -717,7 +717,8 @@ class RuleDQfD(OffPolicyAlgorithm):
                     action_value_pairs.append((act_name, -1))
 
             action_value_pairs_dict[rel_s_id] = action_value_pairs
-        fix_action = norm_helper.get_action(env_state, action_value_pairs_dict)
+            eaten_ghost_before = sum(env_state.data.agentEatenCnt[1:]) > 0
+        fix_action = norm_helper.get_action(env_state, action_value_pairs_dict, eaten_ghost_before)
         return fix_action, orig_action
 
     # copied from base class

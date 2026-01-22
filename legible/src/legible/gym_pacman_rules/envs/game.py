@@ -389,6 +389,7 @@ class GameStateData:
             self.layout = prevState.layout
             self._eaten = prevState._eaten
             self.score = prevState.score
+            self.eaten_ghost = prevState.eaten_ghost
 
         self._foodEaten = None
         self._foodAdded = None
@@ -397,6 +398,7 @@ class GameStateData:
         self._lose = False
         self._win = False
         self.scoreChange = 0
+        self.eaten_ghost = False
 
 
     def deepCopy( self ):
@@ -407,6 +409,7 @@ class GameStateData:
         state._foodEaten = self._foodEaten
         state._foodAdded = self._foodAdded
         state._capsuleEaten = self._capsuleEaten
+        state.eaten_ghost = self.eaten_ghost
         return state
 
     def copyAgentStates( self, agentStates ):
@@ -425,6 +428,7 @@ class GameStateData:
         if not self.food == other.food: return False
         if not self.capsules == other.capsules: return False
         if not self.score == other.score: return False
+        if not self.eaten_ghost == other.eaten_ghost: return False
         return True
 
     def __hash__( self ):
@@ -501,6 +505,7 @@ class GameStateData:
         self.layout = layout
         self.score = 0
         self.scoreChange = 0
+        self.eaten_ghost = False
 
         self.agentStates = []
         numGhosts = 0
