@@ -21,10 +21,10 @@ def setup(cfg):
     config_str = f"{norms}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn",horizon=cfg.asp.horizon,radius=cfg.asp.radius, norm_descriptor=config_str)
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
     
     shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True,horizon=cfg.asp.horizon,radius=cfg.asp.radius, norm_descriptor=config_str)
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True, config_str=config_str)
 
     if shield_initial is None:
         sys.exit("Could not load initial shield, check if it exists.")

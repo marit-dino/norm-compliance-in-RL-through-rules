@@ -21,7 +21,7 @@ def setup(cfg):
 
     #TODO what is difference between uncorr and improved?
     shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", norm_descriptor=config_str)
+                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
 
     if shield is None:
         sys.exit("Could not load shield, check if it exists.")
