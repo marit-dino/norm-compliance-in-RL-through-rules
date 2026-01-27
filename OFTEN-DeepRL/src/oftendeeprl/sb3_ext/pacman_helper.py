@@ -14,7 +14,8 @@ class PacmanClingoHelper(ClingoHelper):
              "-c", f"ghosts={ghosts}"])
         self.ctl.load('../../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
         self.ctl.ground([("base", [])], context=self)
-
+        
+        self.horizon = horizon
         self.radius = radius
         self.next = None
         self.penalty = 0
@@ -100,7 +101,8 @@ class PacmanClingoHelper(ClingoHelper):
                     Number(-j)
                 ]), False)
         
-        self.ctl.assign_external(Function("eaten_ghost", []), False)
+        for t in range (0, self.horizon):
+            self.ctl.assign_external(Function("eaten_ghost", [Number(t)]), False)
 
 
     def set_clingo_externals(self, state, actionValuePairs, eaten_ghost_before):
@@ -190,9 +192,10 @@ class PacmanClingoHelper(ClingoHelper):
             
 
         if self.permissive:
-            self.ctl.assign_external(Function("eaten_ghost", []), eaten_ghost_before)
+            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), eaten_ghost_before)
         else: 
-            self.ctl.assign_external(Function("eaten_ghost", []), False)
+            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), False)
+
 
     def get_action(self, state, actionValuePairs, eaten_ghost_before):
         self.next = None

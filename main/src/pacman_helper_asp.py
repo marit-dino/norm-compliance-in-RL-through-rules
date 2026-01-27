@@ -49,44 +49,44 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
                         1] >= state.getWalls().height:
                         self.ctl.assign_external(
                             Function("wall", [Number(i), Number(j)]), True)
-                        log.info(f"wall({i},{j}).")
+                        #log.info(f"wall({i},{j}).")
                     elif state.getWalls()[absolut[0]][absolut[1]]:
                         self.ctl.assign_external(
                             Function("wall", [Number(i), Number(j)]), True)
-                        log.info(f"wall({i},{j}).")
+                        #log.info(f"wall({i},{j}).")
                     absolut = (midpoint[0] - i, midpoint[1] + j)
                     if absolut[0] < 0 or absolut[1] < 0 or absolut[
                         0] >= state.getWalls().width or absolut[
                         1] >= state.getWalls().height:
                         self.ctl.assign_external(
                             Function("wall", [Number(-i), Number(j)]), True)
-                        log.info(f"wall({-i},{j}).")
+                        #log.info(f"wall({-i},{j}).")
                     elif state.getWalls()[absolut[0]][absolut[1]]:
                         self.ctl.assign_external(
                             Function("wall", [Number(-i), Number(j)]), True)
-                        log.info(f"wall({-i},{j}).")
+                        #log.info(f"wall({-i},{j}).")
                     absolut = (midpoint[0] + i, midpoint[1] - j)
                     if absolut[0] < 0 or absolut[1] < 0 or absolut[
                         0] >= state.getWalls().width or absolut[
                         1] >= state.getWalls().height:
                         self.ctl.assign_external(
                             Function("wall", [Number(i), Number(-j)]), True)
-                        log.info(f"wall({i},{-j}).")
+                        #log.info(f"wall({i},{-j}).")
                     elif state.getWalls()[absolut[0]][absolut[1]]:
                         self.ctl.assign_external(
                             Function("wall", [Number(i), Number(-j)]), True)
-                        log.info(f"wall({i},{-j}).")
+                        #log.info(f"wall({i},{-j}).")
                     absolut = (midpoint[0] - i, midpoint[1] - j)
                     if absolut[0] < 0 or absolut[1] < 0 or absolut[
                         0] >= state.getWalls().width or absolut[
                         1] >= state.getWalls().height:
                         self.ctl.assign_external(
                             Function("wall", [Number(-i), Number(-j)]), True)
-                        log.info(f"wall({-i},{-j}).")
+                        #log.info(f"wall({-i},{-j}).")
                     elif state.getWalls()[absolut[0]][absolut[1]]:
                         self.ctl.assign_external(
                             Function("wall", [Number(-i), Number(-j)]), True)
-                        log.info(f"wall({-i},{-j}).")
+                        #log.info(f"wall({-i},{-j}).")
 
             # ghosts
             for c, g in enumerate(state.getGhostPositions()):
@@ -95,38 +95,38 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
                         relative[1]) > self.radius:
                     self.ctl.assign_external(Function("goutside", [Number(c)]),
                                             True)
-                    log.info(f"goutside({c}).")
+                    #log.info(f"goutside({c}).")
                 elif self.vegetarian and c == 0:
                     self.ctl.assign_external(Function("goutside", [Number(c)]),
                                             True)
-                    log.info(f"goutside({c}).")
+                    #log.info(f"goutside({c}).")
                 else:
                     self.ctl.assign_external(
                         Function("gcol",
                                 [Number(c), Number(int(relative[0])), Number(0)]),
                         True)
-                    log.info(f"gcol({c},{int(relative[0])},0).")
+                    #log.info(f"gcol({c},{int(relative[0])},0).")
                     self.ctl.assign_external(
                         Function("grow",
                                 [Number(c), Number(int(relative[1])), Number(0)]),
                         True)
-                    log.info(f"grow({c},{int(relative[1])},0).")
+                    #log.info(f"grow({c},{int(relative[1])},0).")
                     
             # number of violations
             self.ctl.assign_external(Function("num_violations", [Number(num_violations)]), True)
-            log.info(f"num_violations({num_violations}).")
+            #log.info(f"num_violations({num_violations}).")
             # dynamic horizon
-            log.info(f"setting dynamic horizon to {dynamic_horizon}")
-            log.info(f"dynamic_horizon({dynamic_horizon}).")
+            #log.info(f"setting dynamic horizon to {dynamic_horizon}")
 
             self.ctl.assign_external(Function("dynamic_horizon", [Number(dynamic_horizon)]), True)
             # has already eaten a ghost before
             if self.permissive:
-                log.info(f"setting eaten_ghost to {eaten_ghost_before}")
-                self.ctl.assign_external(Function("eaten_ghost", []), eaten_ghost_before)
-                log.info(f"eaten_ghost.")
+                #log.info(f"setting eaten_ghost to {eaten_ghost_before}")
+                self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), eaten_ghost_before)
+
             else: 
-                self.ctl.assign_external(Function("eaten_ghost", []), False)
+                self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), False)
+
 
 
             
@@ -144,6 +144,5 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
 
         # solve the LP
         result = self.ctl.solve(on_model=self.on_model)
-        log.info(self.next)
     
         return result.satisfiable

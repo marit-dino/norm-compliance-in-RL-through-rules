@@ -256,7 +256,7 @@ class PacmanEnv(gymnasium.Env):
                 'r': self.cum_reward,
                 'l': self.step_counter
             }]
-        if not self.game.state.data.eaten_ghost and  True in self.game.state.data._eaten[1:]:
+        if not self.game.state.data.eaten_ghost and True in self.game.state.data._eaten[1:]:
             self.game.state.data.eaten_ghost = True
         return self.features.obs_from_state(self.game.state, action), reward, terminated, truncated, info
 

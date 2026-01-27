@@ -25,7 +25,7 @@ def get_shield_number(cfg):
     if cfg.rules.shield_number is None:
         norm_descriptor = f"{'_'.join(cfg.norms)}"
         config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
-        shield_name = f"norm_guided_dqn_{cfg.env.name.replace('/', '_')}_{cfg.env.level}__{config_str}__feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
+        shield_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
         shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name) and not "updated" in f]
         if len(shields) == 0:
             sys.exit(f"No shield found that matches the provided parameters: {shield_name}")

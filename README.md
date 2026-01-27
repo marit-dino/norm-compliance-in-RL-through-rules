@@ -17,8 +17,10 @@ Open tasks:
 - [ ] documentation/comments
 - [ ] add more complex norms
   - [x] add to norm check 
-  - [ ] often deep rl
+  - [x] often deep rl
+  - [x] ghost_eaten over time in asp
   - [ ] add feature to features of rules
+  - [ ] check whether it works for larger horizon
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

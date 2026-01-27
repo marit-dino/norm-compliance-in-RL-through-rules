@@ -10,15 +10,14 @@ def violated_vegetarian(state):
     return 0
 
 def violated_vegan(state):
-    if state.data._eaten[1] or state.data._eaten[2]:
+    if True in state.data._eaten[1:]:
         log.info("norm 'vegan' violated")
         return 1
     return 0
 
 
 def violated_permissive(state, eaten_ghost):
-    # TODO extend based on number of ghosts
-    current_eaten = state.data._eaten[1] or state.data._eaten[2]
+    current_eaten = True in state.data._eaten[1:]
     if current_eaten and not eaten_ghost:
         log.info("norm 'permissive' violated")
         return 1

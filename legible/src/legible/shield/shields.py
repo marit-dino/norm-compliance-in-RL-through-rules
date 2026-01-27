@@ -233,7 +233,7 @@ class AspShield(Shield):
         for i,fi in enumerate(self.feature_indices):
             if fi not in self.categorical_features:
                 enum_interval = enumerate(self.feature_intervals[fi])
-                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) #replace_single_cont_value(fvs[i], fi, enum_interval) TODO can i do this?
+                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) 
         return fvs
 
     def raw_features(self, obs):

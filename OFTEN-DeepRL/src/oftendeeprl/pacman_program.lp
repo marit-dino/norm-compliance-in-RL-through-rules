@@ -4,7 +4,7 @@
 #external grow(G,R,0) : G=0..ghosts-1, R=-radius..radius.
 #external goutside(G) : G=0..ghosts-1.
 #external wall(C,R) : C=-radius..radius, R=-radius..radius.
-#external eaten_ghost.
+#external eaten_ghost(N) : N=0..max_horizon.
 
 
 % rewards for the actions of the agent
@@ -60,8 +60,11 @@ ok(T,G) :- ok(T,G,0), ok(T,G,1).
 ok(T,G) :- goutside(G), T=1..horizon-1.
 good(T,G) | bad(T,G) :- G=0..ghosts-1, T=1..horizon-1.
 ok(T,G) :- bad(T,G).
-ok(T,G) :- eaten_ghost, G=0..ghosts-1, horizon(T).
+ok(T,G) :- eaten_ghost(T), G=0..ghosts-1, T=1..horizon-1.
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
+
+ghost_eaten(T+1) :- ghost_eaten(T), T=1..horizon-1.
+ghost_eaten(T+1) :- bad(T,G), T=1..horizon-1, G=0..ghosts-1.
 
 % penalty for violating the norm of eating a ghost
 penalty(P, T) :- P = horizon - T, bad(T,F).
