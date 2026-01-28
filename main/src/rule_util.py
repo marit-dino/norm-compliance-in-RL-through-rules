@@ -150,9 +150,10 @@ def set_rules(shield):
     
 
 def save_rule_set(shield, cfg):
+    norm_descriptor = f"{'_'.join(cfg.norms)}"
+    config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
     shield_name = f"pickles/shields/uncorr/"\
-                  f"norm_guided_dqn_{cfg.env.name.replace('/','_')}_{cfg.env.level}_{cfg.asp.horizon}_{cfg.asp.radius}_feat_{cfg.rules.nr_features}_"\
-                  f"{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
+                    f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
 
     if cfg.rules.shield_number is None:
         save_pickle(shield_name,shield)

@@ -21,6 +21,9 @@ def violated_permissive(state, eaten_ghost):
     if current_eaten and not eaten_ghost:
         log.info("norm 'permissive' violated")
         return 1
+    # TODO remove (currently for debugging purposes)
+    if current_eaten and eaten_ghost:
+        log.info("eaten ghost, after having already eaten one")
     return 0
 
 

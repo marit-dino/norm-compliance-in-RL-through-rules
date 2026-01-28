@@ -13,7 +13,7 @@ training:
 rules:
   episodes: 600
   steps: 2500_000
-  nr_features: 62
+  nr_features: 63
   lime_test_size: 100
   compute_correlation: False
   feature_extractor: extended-8

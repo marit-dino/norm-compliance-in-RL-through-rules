@@ -13,7 +13,10 @@ Open tasks:
     - [x] store updated rule set
     - [x] everything can be enumerated because of the intervals -> adapt rule update process
     - [ ] save rules as string in pickle instead of object (-> add some tag to identify udpated rules)?
+    - [x] prune rules only if there have been added enough
     - [x] check why "nothing to update" does not occur anymore
+    - [ ] how to deal (if) with the case where pacman gets forbidden to move into a certain direction, but then repeatedly moves into a wall and afterwards eats a ghost?
+    (originally, the violation could have been prevented, but the "horizon is spammed" by repeatedly moving into a wall) should this be caught by "get_blocked_actions" (or would this be too much external information)?
 - [ ] documentation/comments
 - [ ] add more complex norms
   - [x] add to norm check 

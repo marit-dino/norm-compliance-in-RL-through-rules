@@ -63,8 +63,8 @@ ok(T,G) :- bad(T,G).
 ok(T,G) :- eaten_ghost(T), G=0..ghosts-1, T=1..horizon-1.
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
 
-ghost_eaten(T+1) :- ghost_eaten(T), T=1..horizon-1.
-ghost_eaten(T+1) :- bad(T,G), T=1..horizon-1, G=0..ghosts-1.
+eaten_ghost(T+1) :- eaten_ghost(T), T=0..horizon-1.
+eaten_ghost(T+1) :- bad(T,G), T=1..horizon-1, G=0..ghosts-1.
 
 % penalty for violating the norm of eating a ghost
 penalty(P, T) :- P = horizon - T, bad(T,F).

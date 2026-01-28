@@ -120,13 +120,9 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
 
             self.ctl.assign_external(Function("dynamic_horizon", [Number(dynamic_horizon)]), True)
             # has already eaten a ghost before
-            if self.permissive:
+            if self.permissive and eaten_ghost_before:
                 #log.info(f"setting eaten_ghost to {eaten_ghost_before}")
-                self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), eaten_ghost_before)
-
-            else: 
-                self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), False)
-
+                self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), True)
 
 
             

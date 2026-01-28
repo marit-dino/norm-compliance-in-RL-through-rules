@@ -97,14 +97,14 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
                             f"action: {last_n_actions[j+1]}"
                         )
-                        log.info(f"violations {sum(last_n_violations[j:])}")
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(last_n_violations[j:]), cfg.asp.horizon-j, prev_env_states[j]["game_state"].data.eaten_ghost))
+                        log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j, len(last_n_violations)))}")
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["game_state"].data.eaten_ghost))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
-                log.info(less_violations_possible)
                 if True in less_violations_possible:
+                    rule_set_changes_over_period += 1
                     prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
                     rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[-1] if r != [] and r[0][0].polarity]
@@ -112,9 +112,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
                         rules_snapshot = add_differing_enumerable_features(r, feature_extractor.getFeatures(last_n_states[-2],last_n_actions[-1]), categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
-                    backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, violation=False)
+                    backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations)
 
-                    
                 else:
                     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
 
@@ -138,18 +137,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     log.info(f"Total Violations: {total_violations}")
 
 
-# TODO check if violations are handled correctly
-def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, violation=True):
-    log.info(f"violations before backtracking: {last_n_violations}")
+def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations):
     env.unwrapped.load_state(prev_env_states[-2])   
     prev_env_states.pop()
-    if violation:
-        last_n_violations.pop()
+    last_n_violations.pop()
     last_n_states.pop()
     last_n_actions.pop()
-    log.info(f"violations after backtracking: {last_n_violations}")
-
-
 
 
 def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
@@ -165,7 +158,7 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
 
     if False not in list(actions_blocked_by_created_rules.values()):
         prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
-        backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations, feature_extractor, violation=False)
+        backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations)
         rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
         return rules_snapshot
     else:

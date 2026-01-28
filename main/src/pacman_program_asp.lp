@@ -65,8 +65,8 @@ ok(T,G) :- bad(T,G).
 ok(T,G) :- eaten_ghost(T), G=0..ghosts-1, horizon(T).
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
 
-ghost_eaten(T+1) :- ghost_eaten(T), horizon(T).
-ghost_eaten(T+1) :- bad(T,G), G=0..ghosts-1, horizon(T).
+eaten_ghost(T+1) :- eaten_ghost(T), T=0..N-1, dynamic_horizon(N).
+eaten_ghost(T+1) :- bad(T,G), G=0..ghosts-1, horizon(T).
 
 
 :- V = #sum{1, T, G : bad(T,G), T=0..H-1, dynamic_horizon(H), G=0..ghosts-1}, V >= N, num_violations(N).
