@@ -58,6 +58,13 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
         
 
 def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg):
+    rules = [r[0] for r in (list(shield.cancelable_rules.values()) + list(shield.enforceable_rules.values())) if r[0].mined == False]
+    if rules == []:
+        return RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = shield.cancelable_rules,
+        )
+
     logging.disable(logging.CRITICAL)
     rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
     logging.disable(logging.NOTSET)

@@ -189,12 +189,9 @@ class PacmanClingoHelper(ClingoHelper):
             self.ctl.assign_external(Function("action",
                                               [Number(a),
                                                Number(r)]), True)
-            
 
-        if self.permissive:
-            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), eaten_ghost_before)
-        else: 
-            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), False)
+        if self.permissive and eaten_ghost_before:
+            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), True)
 
 
     def get_action(self, state, actionValuePairs, eaten_ghost_before):

@@ -9,6 +9,7 @@ from pacman_helper_asp import PacmanViolationClingoHelper
 import sys, logging
 import check_norms
 import copy
+import itertools
 from collections import deque 
 
 log = logging.getLogger(__name__)
@@ -61,6 +62,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
         cancelable_rules = shield.cancelable_rules,
     )
 
+    rule_set_changes_over_period = 0
+
     for i in range(cfg.rules.updates.episodes):
         log.info(f"Episode {i+1}/{cfg.rules.updates.episodes}")
 
@@ -72,6 +75,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
 
             if len(shield.get_blocked_actions(obs_rules)) == 4:
+                rule_set_changes_over_period += 1
                 rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
 
             action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
@@ -131,8 +135,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 break
         
         if i % cfg.rules.updates.prune_interval == 0 and i != 0:
-            log.info("Pruning rules.")
-            rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
+            if rule_set_changes_over_period > 1:
+                log.info("Pruning rules.")
+                rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
+            rule_set_changes_over_period = 0
 
     log.info(f"Total Violations: {total_violations}")
 
