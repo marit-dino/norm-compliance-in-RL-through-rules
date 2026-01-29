@@ -6,7 +6,7 @@
 #external grow(G,R,0) : G=0..ghosts-1, R=-radius..radius.
 #external goutside(G) : G=0..ghosts-1.
 #external wall(C,R) : C=-radius..radius, R=-radius..radius.
-#external num_violations(N) : N=1..num_norms*max_horizon.
+#external num_violations(N) : N=1..ghosts*max_horizon.
 #external dynamic_horizon(N) : N=1..max_horizon.
 #external eaten_ghost(N) : N=0..max_horizon.
 

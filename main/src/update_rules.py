@@ -17,8 +17,7 @@ log = logging.getLogger(__name__)
 def setup(cfg):
     env, model, model_name, action_tensor = setup_model(cfg)
     shield_number = get_shield_number(cfg)
-    norms = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norms}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
+    config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     #TODO what is difference between uncorr and improved?
     shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
@@ -191,7 +190,7 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
-        if fi in cfg.rules.updates.exclude_features_in_neg_rules or fi in feature_indices_in_rule:
+        if fi in cfg.norm.exclude_features_in_rules or fi in feature_indices_in_rule:
             continue
         elif fi in categorical_features:
             for i,r in enumerate(adapted_rules):

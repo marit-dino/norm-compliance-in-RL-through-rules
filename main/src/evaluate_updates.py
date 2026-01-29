@@ -16,9 +16,7 @@ def setup(cfg):
     env, model, model_name, action_tensor = setup_model(cfg)
 
     shield_number = get_shield_number(cfg)
-
-    norms = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norms}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
+    config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
@@ -49,7 +47,7 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     
     def count_violations(state):
-        return check_norms.num_violations_detected(cfg.norms, state)
+        return check_norms.num_violations_detected(cfg.norm.id, state)
     
     stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon)
 

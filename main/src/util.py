@@ -8,9 +8,7 @@ import torch
 
 
 def get_model_number(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
-
+    config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     if cfg.rules.model_number is None:
         model_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.env.level}_{cfg.training.feature_extractor}"
         norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
@@ -23,8 +21,7 @@ def get_model_number(cfg):
     
 def get_shield_number(cfg):
     if cfg.rules.shield_number is None:
-        norm_descriptor = f"{'_'.join(cfg.norms)}"
-        config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
+        config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
         shield_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
         shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name) and not "updated" in f]
         if len(shields) == 0:
@@ -35,10 +32,8 @@ def get_shield_number(cfg):
     
 
 def setup_model(cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    norm_descriptor = f"{cfg.norms[0]}"
-    config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
 
+    config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
                                                                                     cfg.env.level, config_str, 
                                                                                     cfg.training.steps_initial, cfg.training.steps_norm,

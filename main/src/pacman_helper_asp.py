@@ -10,11 +10,10 @@ log = logging.getLogger(__name__)
 
 class PacmanViolationClingoHelper(PacmanClingoHelper):
 
-    def __init__(self, horizon, radius, ghosts, norms, num_norms):
+    def __init__(self, horizon, radius, ghosts, norm):
         self.ctl = clingo.Control(
             ["-c", f"max_horizon={horizon}",
              "-c", f"radius={radius}",
-             "-c", f"num_norms={num_norms}",
              "-c", f"ghosts={ghosts}"])
         self.ctl.load('pacman_program_asp.lp')
         self.ctl.ground([("base", [])], context=self)
@@ -22,14 +21,14 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = "vegetarian" in norms
-        self.permissive = "permissive" in norms
-        self.num_norms = num_norms
+        self.vegetarian = "vegetarian" == norm
+        self.permissive = "permissive" == norm
         self.horizon = horizon
+        self.ghosts = ghosts
 
 
     def reset_clingo_externals(self, state):
-        for v in range(0, self.num_norms * self.horizon):
+        for v in range(0, self.ghosts * self.horizon):
             self.ctl.assign_external(Function("num_violations", [Number(v)]), False)
         
         for h in range(0, self.horizon):

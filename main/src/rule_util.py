@@ -1,9 +1,8 @@
-import logging, copy
+import logging
 from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from legible.rule_learning.util import save_pickle
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
-import check_norms
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class RuleSnapshot:
 
 
 
-def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm, episodes, norms):
+def collect_data(model, env, action_tensor,feature_extractor, shield, rule_chooser,training_algorithm, episodes):
     triggered_rules_list = []
 
     obs, _info = env.reset()
@@ -39,7 +38,7 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
             action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values        
-            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost))
             
             action, triggered_rules = get_action(model, obs, obs_rules, shield, env.unwrapped.game.state,rule_chooser, rules_snapshot, training_algorithm, act_logits, action_tensor)
             triggered_rules_list.append(triggered_rules)
@@ -66,7 +65,7 @@ def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_ch
         )
 
     logging.disable(logging.CRITICAL)
-    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
+    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
     logging.disable(logging.NOTSET)
     rules_snapshot = remove_unused_rules(rule_data, rule_chooser, shield)
     
@@ -122,7 +121,7 @@ def remove_unused_rules(data, rule_chooser, shield):
 
 def add_retaining_rules(rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg):
     logging.disable(logging.CRITICAL)
-    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes, cfg.norms)
+    rule_data = collect_data(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg.training.algorithm, cfg.rules.updates.data_collection_episodes)
     logging.disable(logging.NOTSET)
     flattened_data = [r[0] for rs in rule_data for rt in rs for r in rt]
     
@@ -157,8 +156,7 @@ def set_rules(shield):
     
 
 def save_rule_set(shield, cfg):
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norm_descriptor}__{cfg.asp.horizon}_{cfg.asp.radius}"
+    config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     shield_name = f"pickles/shields/uncorr/"\
                     f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
 

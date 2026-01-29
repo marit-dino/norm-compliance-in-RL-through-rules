@@ -35,11 +35,8 @@ NORM_CHECKS = {
 }
 
 
-def num_violations_detected(norms, state, ghost_eaten=False):
-    violations = 0
-    for norm in norms:
-        if norm == "permissive":
-            violations += NORM_CHECKS[norm](state, ghost_eaten)
-        else:
-            violations += NORM_CHECKS[norm](state)
-    return violations
+def num_violations_detected(norm, state, ghost_eaten=False):
+    if norm == "permissive":
+        return NORM_CHECKS[norm](state, ghost_eaten)
+    else:
+        return NORM_CHECKS[norm](state)
