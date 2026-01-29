@@ -54,7 +54,7 @@ def setup_model(cfg):
 def order_feature_indices(shield, env, feature_extractor):
     obs, info = env.reset()
     feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    features = feature_extractor.getFeatures(env.unwrapped.game.state,None)
+    features = feature_extractor.getFeatures(env.unwrapped.game.state,None,False)
     ordered_features = sorted(list(features.items()),key=lambda x: x[0])
 
     feature_to_index = {

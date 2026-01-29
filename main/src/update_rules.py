@@ -37,10 +37,12 @@ def setup(cfg):
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     total_violations = 0
     last_n_violations = deque(maxlen=cfg.asp.horizon)
+    last_n_obs_rules = deque(maxlen=cfg.asp.horizon)
     last_n_states = deque(maxlen=cfg.asp.horizon)
     last_n_actions = deque(maxlen=cfg.asp.horizon)
     prev_env_states = deque(maxlen=cfg.asp.horizon)
     last_n_triggered_rules = deque(maxlen=cfg.asp.horizon)
+    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
 
 
     obs, info = env.reset()
@@ -49,13 +51,13 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     obs_t = obs_t.to(action_tensor.device)
     last_n_actions.append(None)
     last_n_violations.append(0)
-    last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
+    last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost)))
+    last_n_states.append(env.unwrapped.game.state)
     prev_env_states.append(env.unwrapped.save_state())
     last_n_triggered_rules.append([])
 
 
-    feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norms, num_norms=len(cfg.norms))
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norm)
 
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -72,20 +74,20 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values        
-            obs_rules = features_dict_to_array(feature_extractor.getFeatures(last_n_states[-1],action))
 
-            if len(shield.get_blocked_actions(obs_rules)) == 4:
+            if len(shield.get_blocked_actions(last_n_obs_rules[-1])) == 4:
                 rule_set_changes_over_period += 1
-                rules_snapshot = all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                rules_snapshot = all_actions_blocked(last_n_obs_rules[-1], shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
 
-            action, triggered_rules = get_action(model, obs, obs_rules, shield, last_n_states[-1], rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
+            action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
-            prev_eaten = env.unwrapped.game.state.data.eaten_ghost
+            prev_eaten = env.unwrapped.eaten_ghost
             obs, reward, term, trunc, info = env.step(action)
-            last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
+            last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost)))
             last_n_actions.append(action)
-            last_n_violations.append(check_norms.num_violations_detected(cfg.norms, last_n_states[-1], prev_eaten))
+            last_n_states.append(env.unwrapped.game.state)
+            last_n_violations.append(check_norms.num_violations_detected(cfg.norm.id, last_n_states[-1], prev_eaten))
             prev_env_states.append(env.unwrapped.save_state())
 
             obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -125,12 +127,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 obs, info = env.reset()
                 obs_t, vectorized_env = policy.obs_to_tensor(obs)
                 obs_t = obs_t.to(action_tensor.device)
-                last_n_states = deque(maxlen=cfg.asp.horizon)
+                last_n_obs_rules = deque(maxlen=cfg.asp.horizon)
                 last_n_actions = deque(maxlen=cfg.asp.horizon)
                 last_n_violations = deque(maxlen=cfg.asp.horizon)
                 last_n_actions.append(None)
                 last_n_violations.append(0)
-                last_n_states.append(env.unwrapped.game.state)
+                last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost)))
                 last_n_triggered_rules.append([])
                 break
         
@@ -151,8 +153,8 @@ def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violat
     last_n_actions.pop()
 
 
-def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
-    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
+def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations,last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
+    triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(last_n_obs_rules[-1],rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
     neg_actions = [r[0].rule_head.action for r in neg_rules_triggered]
     blocked_actions = set(neg_actions)
@@ -177,8 +179,8 @@ def all_actions_blocked(obs_rules, shield, rule_chooser, rules_snapshot, last_n_
         return rules_snapshot
 
 
-def add_differing_enumerable_features(mined_rule,state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
-    discretized_features = shield.discretize(features_dict_to_array(state_features)).astype(int)
+def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
+    discretized_features = shield.discretize(obs_rules).astype(int)
 
     feature_facts = {
         fi: value
