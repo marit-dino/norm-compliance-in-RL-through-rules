@@ -103,21 +103,29 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"action: {last_n_actions[j+1]}"
                         )
                         log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j, len(last_n_violations)))}")
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["game_state"].data.eaten_ghost))
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
                 if True in less_violations_possible:
                     rule_set_changes_over_period += 1
-                    prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
-                    rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
-                    pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[-1] if r != [] and r[0][0].polarity]
+                    index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
+                    
+                    log.info(less_violations_possible)
+                    # log.info(f"change here :\n {last_n_states[index]}")
+                    # log.info(last_n_actions)
+                    # log.info(last_n_triggered_rules)
+                    # log.info(f"action: {last_n_actions[index+1]}")
+                    # log.info(f"triggered rules: {last_n_triggered_rules[index+1]}")
+                    # log.info(last_n_actions)
+                    rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
+                    pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[index+1] if r != [] and r[0][0].polarity]
                     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
-                        rules_snapshot = add_differing_enumerable_features(r, feature_extractor.getFeatures(last_n_states[-2],last_n_actions[-1]), categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
-                    backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations)
+                        rules_snapshot = add_differing_enumerable_features(r, last_n_obs_rules[index], categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
+                    backtrack(index, cfg.asp.horizon, last_n_actions, last_n_obs_rules, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
 
                 else:
                     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
@@ -144,12 +152,17 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     log.info(f"Total Violations: {total_violations}")
 
 
-def backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations):
-    env.unwrapped.load_state(prev_env_states[-2])   
-    prev_env_states.pop()
-    last_n_violations.pop()
-    last_n_states.pop()
-    last_n_actions.pop()
+def backtrack(index, horizon, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules):
+    log.info(f"backtracking from: \n {env.unwrapped.game.state}")
+    env.unwrapped.load_state(prev_env_states[index])   
+    for i in range(horizon - 1 - index):
+        prev_env_states.pop()
+        last_n_violations.pop()
+        last_n_states.pop()
+        last_n_actions.pop()
+        last_n_triggered_rules.pop()
+        last_n_obs_rules.pop()
+    log.info(f"to: \n {env.unwrapped.game.state}")
 
 
 def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations,last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
@@ -164,14 +177,14 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
 
     if False not in list(actions_blocked_by_created_rules.values()):
-        prev_obs =  features_dict_to_array(feature_extractor.getFeatures(state=last_n_states[-2], action=last_n_actions[-1]))
-        backtrack(last_n_actions, last_n_states, prev_env_states, env, last_n_violations)
-        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.rules.updates.exclude_features_in_neg_rules)
+        prev_obs = last_n_obs_rules[-2]
+        backtrack(len(last_n_actions) - 2, cfg.asp.horizon, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
+        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
         return rules_snapshot
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
-        state_features = feature_extractor.getFeatures(last_n_states[-1],last_n_actions[-1])
+        state_features = last_n_obs_rules[-1]
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
         rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
         rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
