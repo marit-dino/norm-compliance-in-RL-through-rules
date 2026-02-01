@@ -23,7 +23,7 @@ Open tasks:
   - [x] ghost_eaten over time in asp
   - [ ] add feature to features of rules
   - [ ] check whether it works for larger horizon
-  - [ ] move feature back to env (oftendeeprl)
+  - [x] move feature back to env (oftendeeprl)
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

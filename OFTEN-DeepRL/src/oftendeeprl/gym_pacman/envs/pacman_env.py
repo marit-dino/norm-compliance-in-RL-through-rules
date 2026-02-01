@@ -100,6 +100,7 @@ class PacmanEnv(gymnasium.Env):
             self.do_render = False
         else:
             self.do_render = "render_mode" in kwargs and kwargs["render_mode"] == "human"
+        self.eaten_ghost = False
 
     def setObservationSpace(self):
         screen_width, screen_height = self.display.calculate_screen_dimensions(self.layout.width,   self.layout.height)
@@ -182,7 +183,8 @@ class PacmanEnv(gymnasium.Env):
             'step_counter': [[0]],
         }
         self.initial_info['agent_eaten'] = self.game.state.data.agentEatenCnt
-        return self.features.obs_from_state(self.game.state, None),self.initial_info
+        self.eaten_ghost = False
+        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost),self.initial_info
 
 
     def step(self, action):
@@ -259,7 +261,12 @@ class PacmanEnv(gymnasium.Env):
                 'l': self.step_counter
             }]
         info['agent_eaten'] = self.game.state.data.agentEatenCnt
-        return self.features.obs_from_state(self.game.state, action), reward, terminated, truncated, info
+        
+        if True in self.game.state.data._eaten[1:]:
+            self.eaten_ghost = True
+        
+        print(self.eaten_ghost)
+        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost), reward, terminated, truncated, info
 
     def get_state(self):
         return self.game.state
