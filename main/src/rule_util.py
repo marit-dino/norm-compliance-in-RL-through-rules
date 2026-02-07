@@ -3,6 +3,7 @@ from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from legible.rule_learning.util import save_pickle
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
+from tqdm import tqdm
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def collect_data(model, env, action_tensor,feature_extractor, shield, rule_choos
         cancelable_rules = shield.cancelable_rules,
     )
 
-    for i in range(episodes):
+    for i in tqdm(range(episodes)):
         while True:
             action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()

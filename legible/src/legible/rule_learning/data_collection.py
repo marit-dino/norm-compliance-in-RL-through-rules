@@ -21,7 +21,7 @@ class EpisodeData:
     rewards : list
 
 
-def generate_episode_data(env, model, algo_name, action_tensor, feature_extractor) -> EpisodeData:
+def generate_episode_data(env, model, algo_name, action_tensor, feature_extractor_id) -> EpisodeData:
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -38,8 +38,14 @@ def generate_episode_data(env, model, algo_name, action_tensor, feature_extracto
     data = EpisodeData([],[], [],[],[])
     data.act_logits.append(act_logits)
     data.est_values.append(estimated_value)
-    feature_extractor = get_feature_extractor(feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
-    data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=None))
+
+    if feature_extractor_id == "extended-8":
+        eaten_ghost = env.unwrapped.eaten_ghost
+    else:
+        eaten_ghost = False
+
+    feature_extractor = get_feature_extractor(feature_extractor_id,env.unwrapped.layout.height, env.unwrapped.layout.width)
+    data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=None, eaten_ghost=eaten_ghost))
     while True:
         action, _states = model.predict(obs)
         obs, reward, term, trunc, info = env.step(action)
@@ -57,7 +63,11 @@ def generate_episode_data(env, model, algo_name, action_tensor, feature_extracto
         data.est_values.append(estimated_value)
         data.act_logits.append(act_logits)
         data.actions.append(action)
-        data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=action))
+        if feature_extractor_id == "extended-8":
+            eaten_ghost = env.unwrapped.eaten_ghost
+        else:
+            eaten_ghost = False
+        data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=action, eaten_ghost=eaten_ghost))
         if term and reward <= 0:
             data.rewards.append(min(-1,reward))
         else:
