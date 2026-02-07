@@ -70,13 +70,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
         while True:
             total_violations += last_n_violations[-1]
-            action, _states = model.predict(obs)
             q_values = policy.q_net(obs_t).squeeze()
-            act_logits = q_values        
+            act_logits = q_values    
 
             if len(shield.get_blocked_actions(last_n_obs_rules[-1])) == 4:
                 rule_set_changes_over_period += 1
-                rules_snapshot = all_actions_blocked(last_n_obs_rules[-1], shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
 
             action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
@@ -94,8 +93,11 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             if last_n_violations[-1] > 0:
                 less_violations_possible = []
+                print(len(last_n_actions))
+                print(len(last_n_triggered_rules))
                 for j, state in enumerate(last_n_states):
-                    if j < cfg.asp.horizon - 1: 
+                    if j < cfg.asp.horizon - 1 and j < len(last_n_states): 
+                        print(f"j: {j}")
                         log.info(
                             f"{cfg.asp.horizon - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
@@ -113,19 +115,13 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
                     
                     log.info(less_violations_possible)
-                    # log.info(f"change here :\n {last_n_states[index]}")
-                    # log.info(last_n_actions)
-                    # log.info(last_n_triggered_rules)
-                    # log.info(f"action: {last_n_actions[index+1]}")
-                    # log.info(f"triggered rules: {last_n_triggered_rules[index+1]}")
-                    # log.info(last_n_actions)
                     rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[index+1] if r != [] and r[0][0].polarity]
                     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
                         rules_snapshot = add_differing_enumerable_features(r, last_n_obs_rules[index], categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
-                    backtrack(index, cfg.asp.horizon, last_n_actions, last_n_obs_rules, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
+                    backtrack(index, cfg.asp.horizon, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
 
                 else:
                     log.info("Nothing to update, the number of violations cannot be decreased reliably.")
@@ -135,11 +131,16 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 obs_t, vectorized_env = policy.obs_to_tensor(obs)
                 obs_t = obs_t.to(action_tensor.device)
                 last_n_obs_rules = deque(maxlen=cfg.asp.horizon)
+                last_n_states = deque(maxlen=cfg.asp.horizon)
                 last_n_actions = deque(maxlen=cfg.asp.horizon)
                 last_n_violations = deque(maxlen=cfg.asp.horizon)
+                last_n_triggered_rules = deque(maxlen=cfg.asp.horizon)
                 last_n_actions.append(None)
                 last_n_violations.append(0)
                 last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost)))
+                last_n_states.append(env.unwrapped.game.state)
+                prev_env_states = deque(maxlen=cfg.asp.horizon)
+                prev_env_states.append(env.unwrapped.save_state())
                 last_n_triggered_rules.append([])
                 break
         
@@ -153,16 +154,16 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
 
 def backtrack(index, horizon, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules):
-    log.info(f"backtracking from: \n {env.unwrapped.game.state}")
-    env.unwrapped.load_state(prev_env_states[index])   
-    for i in range(horizon - 1 - index):
+    log.info(f"backtracking {horizon - 1 - index} step(s) to:") 
+    for i in range(horizon - index - 1):
         prev_env_states.pop()
         last_n_violations.pop()
         last_n_states.pop()
         last_n_actions.pop()
         last_n_triggered_rules.pop()
         last_n_obs_rules.pop()
-    log.info(f"to: \n {env.unwrapped.game.state}")
+    env.unwrapped.load_state(prev_env_states[-1])  
+    log.info(f"\n{env.unwrapped.game.state}")
 
 
 def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations,last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
@@ -216,7 +217,9 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
                         tmp_rule_list.append(r.add_feature(fi, interval))
             adapted_rules = tmp_rule_list
     log.info("Testing rules for retention")
+    snapshot = env.unwrapped.save_state()
     rules_snapshot = add_retaining_rules(adapted_rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
+    env.unwrapped.load_state(snapshot)
     return rules_snapshot
        
 
