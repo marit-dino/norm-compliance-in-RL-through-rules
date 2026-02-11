@@ -21,8 +21,8 @@ Open tasks:
   - [x] add to norm check 
   - [x] often deep rl
   - [x] ghost_eaten over time in asp
-  - [ ] add feature to features of rules
-  - [ ] check whether it works for larger horizon
+  - [x] add feature to features of rules
+  - [x] check whether it works for larger horizon
   - [x] move feature back to env (oftendeeprl)
 - [x] evaluation: 
   - [x] count violations
@@ -40,8 +40,4 @@ Open tasks:
 - [x] rule tag for creation
 - [x] currently rules are updated at the wrong state
 - [x] check how intervals affect mined rules
-- [ ] fix bug with backtracking 2 states and then immediate violation (printing index is wrong / out of bounds)
-
-TODO : 
-mine rules and check whether f62 is contained (using a policy that has been trained longer)
-update those rules and check whether that is done correctly
+- [x] fix bug with backtracking 2 states and then immediate violation (printing index is wrong / out of bounds)

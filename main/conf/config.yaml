@@ -20,16 +20,18 @@ rules:
   model_number: 
   shield_number:
   updates:
-    episodes: 500 
-    data_collection_episodes: 100
-    prune_interval: 75
+    episodes: 350 
+    data_collection_episodes: 150
+    prune_interval: 100
+    add_rule_variations: False
+
 
 asp:
   horizon: 3
   radius: 5
 
 eval:
-  nr_episodes: 250
+  nr_episodes: 300
 
 defaults:
   - norm: vegetarian

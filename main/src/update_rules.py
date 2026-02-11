@@ -8,7 +8,7 @@ from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from pacman_helper_asp import PacmanViolationClingoHelper
 import sys, logging
 import check_norms
-import copy
+import copy, random
 import itertools
 from collections import deque 
 
@@ -115,7 +115,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
-                        rules_snapshot = add_differing_enumerable_features(r, last_n_obs_rules[index], categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
+                        if cfg.rules.updates.add_rule_variations:
+                            rules_snapshot = add_differing_enumerable_features(r, last_n_obs_rules[index], categorical_features, shield,rule_chooser,cfg,model, env,action_tensor,feature_extractor)
                     backtrack(len(last_n_states) - index - 1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
 
                 else:
@@ -181,7 +182,8 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
         state_features = last_n_obs_rules[-1]
         categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
         rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
-        rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
+        if cfg.rules.updates.add_rule_variations:
+            rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
         return rules_snapshot
 
 
@@ -195,9 +197,12 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
     rule_copy = copy.deepcopy(mined_rule)
     rule_copy.mined = False
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
+
+    feature_subset = list(set(range(0, cfg.rules.nr_features)) - set(feature_indices_in_rule) - set(cfg.norm.exclude_features_in_rules))
+
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
-        if fi in cfg.norm.exclude_features_in_rules or fi in feature_indices_in_rule:
+        if fi not in feature_subset:
             continue
         elif fi in categorical_features:
             for i,r in enumerate(adapted_rules):
@@ -209,9 +214,11 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
                     if feature_facts[fi] != interval:
                         tmp_rule_list.append(r.add_feature(fi, interval))
             adapted_rules = tmp_rule_list
+
+    adapted_rules_selection = random.sample(adapted_rules, min(len(adapted_rules), 100))
     log.info("Testing rules for retention")
     snapshot = env.unwrapped.save_state()
-    rules_snapshot = add_retaining_rules(adapted_rules, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
+    rules_snapshot = add_retaining_rules(adapted_rules_selection, shield, rule_chooser, model, env, action_tensor, feature_extractor, cfg)
     env.unwrapped.load_state(snapshot)
     return rules_snapshot
        
