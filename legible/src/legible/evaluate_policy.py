@@ -154,7 +154,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
         else:
             raise Exception("Unsupported")
         if use_rule:
-            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost))
             triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
             if triggered_rules == None:
                 triggered_rules = []
