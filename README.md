@@ -4,15 +4,14 @@ Code for my master's thesis.
 Open tasks:
 - [x] start training from main
 - [x] mine rules
-- [ ] adapt feature extractor
-- [ ] update process
+- [x] adapt feature extractor
+- [x] update process
     - [x] update method for rules to exlude specific states
     - [x] check whether less violations are possible in asp
     - [x] what to do if backtracking exceeds horizon? (should this even happen? No)
     - [x] fix "looping" in same violation for a few steps that happens from time to time
     - [x] store updated rule set
     - [x] everything can be enumerated because of the intervals -> adapt rule update process
-    - [ ] save rules as string in pickle instead of object (-> add some tag to identify udpated rules)?
     - [x] prune rules only if there have been added enough
     - [x] check why "nothing to update" does not occur anymore
     - [x] deal with the case where pacman gets forbidden to move into a certain direction, but then repeatedly moves into a wall and afterwards eats a ghost
@@ -24,6 +23,12 @@ Open tasks:
   - [x] add feature to features of rules
   - [x] check whether it works for larger horizon
   - [x] move feature back to env (oftendeeprl)
+  - [ ] CTD:
+    - [x] check norm violation in update process
+    - [x] add flag for moved_north to step() in env 
+    - [ ] add check to ASP (also for oftendeeprl)
+    - [ ] add feature 'moved_north' to training feature extractor (don't forget to also add it to the ordering)
+    - [ ] add norm to pacman clingo helper
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

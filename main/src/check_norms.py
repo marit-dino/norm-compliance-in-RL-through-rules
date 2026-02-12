@@ -21,22 +21,28 @@ def violated_permissive(state, eaten_ghost):
     if current_eaten and not eaten_ghost:
         log.info("norm 'permissive' violated")
         return 1
-    # TODO remove (currently for debugging purposes)
-    if current_eaten and eaten_ghost:
-        log.info("eaten ghost, after having already eaten one")
     return 0
 
+
+def violated_ctd(state, moved_north):
+    viol = violated_vegan(state) 
+    if viol > 0 and not moved_north:
+        return viol + 1
+    return viol
 
 
 NORM_CHECKS = {
     "vegetarian": violated_vegetarian,
     "vegan": violated_vegan,
-    "permissive": violated_permissive
+    "permissive": violated_permissive,
+    "ctd": violated_ctd
 }
 
 
-def num_violations_detected(norm, state, ghost_eaten=False):
+def num_violations_detected(norm, state, ghost_eaten=False, moved_north=False):
     if norm == "permissive":
         return NORM_CHECKS[norm](state, ghost_eaten)
+    elif norm == "ctd":
+        return NORM_CHECKS[norm](state, moved_north)
     else:
         return NORM_CHECKS[norm](state)
