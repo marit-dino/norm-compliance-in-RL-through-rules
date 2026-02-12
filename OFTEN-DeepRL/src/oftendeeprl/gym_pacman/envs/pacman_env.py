@@ -213,12 +213,16 @@ class PacmanEnv(gymnasium.Env):
 
         pacman_action = PACMAN_ACTIONS[action]
 
+        moved_north = False
+
         legal_actions = self.game.state.getLegalPacmanActions()
         illegal_action = False
         if pacman_action not in legal_actions:
             self.illegal_move_counter += 1
             illegal_action = True
             pacman_action = 'Stop' # Stop is always legal
+        elif action == 0:
+            moved_north = True
 
         reward = self.game.step(pacman_action)
         self.cum_reward += reward
@@ -265,7 +269,7 @@ class PacmanEnv(gymnasium.Env):
         if True in self.game.state.data._eaten[1:]:
             self.eaten_ghost = True
         
-        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost), reward, terminated, truncated, info
+        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost, moved_north), reward, terminated, truncated, info
 
     def get_state(self):
         return self.game.state

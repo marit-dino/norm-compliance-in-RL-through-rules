@@ -458,7 +458,7 @@ class ExtendedExtractor8(FeatureExtractor):
         super().__init__(height, width)
         self.legal_neighbor_cache = dict()
 
-    def getFeatures(self, state, action, eaten_ghost):
+    def getFeatures(self, state, action, eaten_ghost=False, moved_north=False):
         # extract the grid of food and wall locations and get the ghost locations
         food = state.getFood()
         walls = state.getWalls()
@@ -563,6 +563,8 @@ class ExtendedExtractor8(FeatureExtractor):
 
         # features["map"] = constract_map_array(self.height,self.width,state)
         features["prev_ghost_eaten"] = eaten_ghost
+        features["moved_north"] = moved_north
+
         return features
 
     def get_obs_space(self,nr_ghosts):
