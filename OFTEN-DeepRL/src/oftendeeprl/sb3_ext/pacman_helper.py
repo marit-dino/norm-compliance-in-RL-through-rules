@@ -11,7 +11,8 @@ class PacmanClingoHelper(ClingoHelper):
         self.ctl = clingo.Control(
             ["-c", f"horizon={horizon}",
              "-c", f"radius={radius}",
-             "-c", f"ghosts={ghosts}"])
+             "-c", f"ghosts={ghosts}",
+             "-c", f"ctd_flag={1 if norm == 'ctd' else 0}"])
         self.ctl.load('../../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
         self.ctl.ground([("base", [])], context=self)
         
@@ -22,6 +23,7 @@ class PacmanClingoHelper(ClingoHelper):
         self.vegetarian = "vegetarian" == norm
         self.permissive = "permissive" == norm
         self.vegan = "vegan" == norm
+        self.ctd = "ctd" == norm
 
     def get_relevant_states(self, state,obs):
         return [(obs,"curr")]
