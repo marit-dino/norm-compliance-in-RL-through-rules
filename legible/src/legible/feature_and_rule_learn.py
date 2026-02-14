@@ -218,7 +218,7 @@ def get_features_and_failure_indication(env_name,mode, feature_extractor):
             nr_ghosts = 2
         else:
             raise Exception("Unknown env.")
-        nr_features_all = 19 + nr_ghosts * 22
+        nr_features_all = 20 + nr_ghosts * 22
         if feature_extractor == "extended-9":
             nr_features_all += 8
         categorical_features = list(range(nr_features_all))
