@@ -12,7 +12,8 @@ class PacmanClingoHelper(ClingoHelper):
             ["-c", f"horizon={horizon}",
              "-c", f"radius={radius}",
              "-c", f"ghosts={ghosts}",
-             "-c", f"ctd_flag={1 if norm == 'ctd' else 0}"])
+             "-c", f"ctd_flag={1 if norm == 'ctd' else 0}",
+             "-c", f"permissive_flag={1 if norm == 'permissive' else 0}"])
         self.ctl.load('../../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
         self.ctl.ground([("base", [])], context=self)
         

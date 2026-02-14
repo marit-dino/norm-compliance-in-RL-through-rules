@@ -27,6 +27,7 @@ def violated_permissive(state, eaten_ghost):
 def violated_ctd(state, moved_north):
     viol = violated_vegan(state) 
     if viol > 0 and not moved_north:
+        log.info("norm 'ctd' violated")
         return viol + 1
     return viol
 

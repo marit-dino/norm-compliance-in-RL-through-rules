@@ -7,6 +7,7 @@
 #external eaten_ghost(N) : N=0..max_horizon.
 
 ctd :- ctd_flag = 1.
+permissive :- permissive_flag = 1.
 
 
 % rewards for the actions of the agent
@@ -47,8 +48,8 @@ sat :- ok(horizon-1).
 
 % saturation criteria for ctd
 ok_ctd(0).
-ok_ctd(0,G) :- G=0..2-1.
-sat_ctd :- ok_ctd(3-1).
+ok_ctd(0,G) :- G=0..ghosts-1.
+sat_ctd :- ok_ctd(horizon-1).
 :- not sat_ctd.
 
 % saturation technique
@@ -68,7 +69,7 @@ ok(T,G) :- ok(T,G,0), ok(T,G,1).
 ok(T,G) :- goutside(G), T=1..horizon-1.
 good(T,G) | bad(T,G) :- G=0..ghosts-1, T=1..horizon-1.
 ok(T,G) :- bad(T,G).
-ok(T,G) :- eaten_ghost(T), G=0..ghosts-1, T=1..horizon-1.
+ok(T,G) :- eaten_ghost(T), permissive, G=0..ghosts-1, T=1..horizon-1.
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
 
 % permissive
@@ -88,10 +89,10 @@ ok_ctd(T) :- {ok_ctd(T,G) : G=0..ghosts-1} = ghosts, ok_ctd(T-1).
 % penalty for violating the norm of eating a ghost
 penalty(P,T) :- P = horizon - T, bad(T,G).
 penalty_ctd(P, T) :- P = horizon - T, bad_ctd(T,G).
-penalty_sum(P1+P2,T) :- penalty(P1,T), penalty_ctd(P2,T), T=1..horizon-1. 
-penalty_sum(P1,T) :- penalty(P1,T), not penalty_ctd(P2,T), T=1..horizon-1, P2=0..horizon. 
-penalty_sum(P2,T) :- not penalty(P1,T), penalty_ctd(P2,T), T=1..horizon-1, P1=0..horizon. 
-
+penalty_sum(P1+P2,T) :- penalty(P1,T), penalty_ctd(P2,T), ctd, T=1..horizon-1. 
+penalty_sum(P1,T) :- penalty(P1,T), not penalty_ctd(P2,T), ctd, T=1..horizon-1, P2=0..horizon. 
+penalty_sum(P2,T) :- not penalty(P1,T), penalty_ctd(P2,T), ctd, T=1..horizon-1, P1=0..horizon. 
+penalty_sum(P,T) :- penalty(P,T), not ctd, T=1..horizon-1.
 
 % encode the reward of the taken action
 reward(X) :- action(0,X), pcol(0,0), pcol(1,1).

@@ -26,9 +26,10 @@ Open tasks:
   - [ ] CTD:
     - [x] check norm violation in update process
     - [x] add flag for moved_north to step() in env 
-    - [ ] add check to ASP (also for oftendeeprl)
-    - [ ] add feature 'moved_north' to training feature extractor (don't forget to also add it to the ordering)
-    - [ ] add norm to pacman clingo helper
+    - [x] add check to ASP (also for oftendeeprl)
+    - [x] add feature 'moved_north' to training feature extractor (don't forget to also add it to the ordering)
+    - [x] add norm to pacman clingo helper
+    - [ ] check correct update / training process
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

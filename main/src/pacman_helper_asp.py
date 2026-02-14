@@ -14,7 +14,9 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.ctl = clingo.Control(
             ["-c", f"max_horizon={horizon}",
              "-c", f"radius={radius}",
-             "-c", f"ghosts={ghosts}"])
+             "-c", f"ghosts={ghosts}",
+             "-c", f"ctd_flag={1 if norm == 'ctd' else 0}",
+             "-c", f"permissive_flag={1 if norm == 'permissive' else 0}"])
         self.ctl.load('pacman_program_asp.lp')
         self.ctl.ground([("base", [])], context=self)
 
@@ -23,6 +25,7 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
         self.penalty = 0
         self.vegetarian = "vegetarian" == norm
         self.permissive = "permissive" == norm
+        self.ctd = "ctd" == norm
         self.horizon = horizon
         self.ghosts = ghosts
 

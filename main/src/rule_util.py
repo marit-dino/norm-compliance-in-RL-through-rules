@@ -286,7 +286,6 @@ def get_action(model, obs, obs_rules, shield, state, rule_chooser, rules_snapsho
     Returns:
         int, list[Rule]: number of chosen action and rules that triggered
     """
-    print(action_tensor)
     action, _state = model.predict(obs)
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(obs_rules,rule_chooser,rules_snapshot)
     if triggered_rules == None:
