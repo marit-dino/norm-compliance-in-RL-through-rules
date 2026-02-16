@@ -4,7 +4,7 @@
 #external grow(G,R,0) : G=0..ghosts-1, R=-radius..radius.
 #external goutside(G) : G=0..ghosts-1.
 #external wall(C,R) : C=-radius..radius, R=-radius..radius.
-#external eaten_ghost(N) : N=0..max_horizon.
+#external eaten_ghost(N) : N=0..horizon.
 
 ctd :- ctd_flag = 1.
 permissive :- permissive_flag = 1.

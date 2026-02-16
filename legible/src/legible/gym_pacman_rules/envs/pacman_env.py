@@ -274,6 +274,10 @@ class PacmanEnv(gymnasium.Env):
 
     def get_image(self):
         return self._get_image(crop=False)
+    
+    def get_moved_north(self, obs):
+        return obs[self.features.feature_order.index("moved_north")]
+
 
     # just change the get image function
     def _get_image(self, crop=True):

@@ -49,13 +49,14 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     obs_t = obs_t.to(action_tensor.device)
     last_n_actions.append(None)
     last_n_violations.append(0)
-    last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost)))
+    moved_north = env.unwrapped.get_moved_north(obs)
+    last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost, moved_north)))
     last_n_states.append(env.unwrapped.game.state)
     prev_env_states.append(env.unwrapped.save_state())
     last_n_triggered_rules.append([])
 
 
-    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norm)
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norm.id)
 
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -81,10 +82,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             prev_eaten = env.unwrapped.eaten_ghost
             obs, reward, term, trunc, info = env.step(action)
 
-            last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost)))
+            moved_north = env.unwrapped.get_moved_north(obs)
+
+            last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost, moved_north)))
             last_n_actions.append(action)
             last_n_states.append(env.unwrapped.game.state)
-            last_n_violations.append(check_norms.num_violations_detected(cfg.norm.id, last_n_states[-1], prev_eaten))
+            last_n_violations.append(check_norms.num_violations_detected(cfg.norm.id, last_n_states[-1], prev_eaten, moved_north))
             prev_env_states.append(env.unwrapped.save_state())
 
             obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -133,7 +136,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 last_n_triggered_rules = deque(maxlen=cfg.asp.horizon)
                 last_n_actions.append(None)
                 last_n_violations.append(0)
-                last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost)))
+                moved_north = env.unwrapped.get_moved_north(obs)
+                last_n_obs_rules.append(features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,None,env.unwrapped.eaten_ghost, moved_north)))
                 last_n_states.append(env.unwrapped.game.state)
                 prev_env_states = deque(maxlen=cfg.asp.horizon)
                 prev_env_states.append(env.unwrapped.save_state())
@@ -141,7 +145,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 break
         
         if i % cfg.rules.updates.prune_interval == 0 and i != 0:
-            if rule_set_changes_over_period > 1:
+            if rule_set_changes_over_period > 1 and cfg.rules.updates.prune_rules:
                 log.info("Pruning rules.")
                 rules_snapshot = prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_chooser, cfg)
             rule_set_changes_over_period = 0
