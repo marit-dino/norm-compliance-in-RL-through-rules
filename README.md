@@ -23,6 +23,7 @@ Open tasks:
   - [x] add feature to features of rules
   - [x] check whether it works for larger horizon
   - [x] move feature back to env (oftendeeprl)
+  - [ ] add more information to evaluation (still open: provide norm id to eval_single_eps)
   - [ ] CTD:
     - [x] check norm violation in update process
     - [x] add flag for moved_north to step() in env 
@@ -30,6 +31,7 @@ Open tasks:
     - [x] add feature 'moved_north' to training feature extractor (don't forget to also add it to the ordering)
     - [x] add norm to pacman clingo helper
     - [ ] check correct update / training process
+    - [ ] fix wrong # violations
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules
