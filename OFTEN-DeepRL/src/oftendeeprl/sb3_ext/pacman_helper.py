@@ -52,9 +52,11 @@ class PacmanClingoHelper(ClingoHelper):
     def reset_clingo_externals(self, state):
         # reset outside ghosts
         for c, g in enumerate(state.getGhostPositions()):
-            self.ctl.assign_external(Function("goutside", [
-                Number(c)
-            ]), False)
+            for i in range(self.horizon):
+                self.ctl.assign_external(Function("goutside", [
+                    Number(i),
+                    Number(c)
+                ]), False)
         # reset actions
         for a in range(4):
             for r in range(4):
@@ -156,10 +158,10 @@ class PacmanClingoHelper(ClingoHelper):
             relative = (g[0] - midpoint[0], g[1] - midpoint[1])
             if abs(relative[0]) > self.radius or abs(
                     relative[1]) > self.radius:
-                self.ctl.assign_external(Function("goutside", [Number(c)]),
+                self.ctl.assign_external(Function("goutside", [Number(0), Number(c)]),
                                          True)
             elif self.vegetarian and c == 0:
-                self.ctl.assign_external(Function("goutside", [Number(c)]),
+                self.ctl.assign_external(Function("goutside", [Number(0), Number(c)]),
                                          True)
             else:
                 self.ctl.assign_external(

@@ -4,7 +4,7 @@
 
 #external gcol(G,C,0) : G=0..ghosts-1, C=-radius..radius.
 #external grow(G,R,0) : G=0..ghosts-1, R=-radius..radius.
-#external goutside(G) : G=0..ghosts-1.
+#external goutside(0,G) : G=0..ghosts-1.
 #external wall(C,R) : C=-radius..radius, R=-radius..radius.
 #external num_violations(N) : N=1..ghosts*max_horizon.
 #external dynamic_horizon(N) : N=1..max_horizon.
@@ -68,11 +68,15 @@ ok(T,G,1) :- pcol(C,T), gcol(G,C',T), C != C', ok(T-1).
 ok(T,G,0) :- prow(R,T), grow(G,R',T-1), R != R', ok(T-1).
 ok(T,G,1) :- prow(R,T), grow(G,R',T), R != R', ok(T-1).
 ok(T,G) :- ok(T,G,0), ok(T,G,1).
-ok(T,G) :- goutside(G), horizon(T).
+ok(T,G) :- goutside(T,G), horizon(T).
 good(T,G) | bad(T,G) :- G=0..ghosts-1, horizon(T).
 ok(T,G) :- bad(T,G).
 ok(T,G) :- eaten_ghost(T), permissive, G=0..ghosts-1, horizon(T).
 ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
+
+% if ghost eaten -> it cannot be eaten again (in this timeframe)
+goutside(T+1,G) :- bad(T,G).
+goutside(T+1,G) :- goutside(T,G), horizon(T).
 
 
 %permissive 
@@ -81,7 +85,7 @@ eaten_ghost(T+1) :- bad(T,G), G=0..ghosts-1, horizon(T).
 
 
 % ctd
-ok_ctd(T,G) :- goutside(G), horizon(T).
+ok_ctd(T,G) :- goutside(T,G), horizon(T).
 ok_ctd(T) :- not ctd, horizon(T).
 ok_ctd(T,G) :- ok(T,G), not bad(T,G).
 

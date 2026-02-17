@@ -95,11 +95,11 @@ class PacmanViolationClingoHelper(PacmanClingoHelper):
                 relative = (g[0] - midpoint[0], g[1] - midpoint[1])
                 if abs(relative[0]) > self.radius or abs(
                         relative[1]) > self.radius:
-                    self.ctl.assign_external(Function("goutside", [Number(c)]),
+                    self.ctl.assign_external(Function("goutside", [Number(0),Number(c)]),
                                             True)
                     #log.info(f"goutside({c}).")
                 elif self.vegetarian and c == 0:
-                    self.ctl.assign_external(Function("goutside", [Number(c)]),
+                    self.ctl.assign_external(Function("goutside", [Number(0),Number(c)]),
                                             True)
                     #log.info(f"goutside({c}).")
                 else:
