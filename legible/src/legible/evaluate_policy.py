@@ -70,9 +70,12 @@ class EvalStats:
         self.nr_wins = sum(wins)
 
         if add_info is not None:
-            (ctd_viol, perm_eaten_ghosts) = add_info
-            self.ctd_violations = ctd_viol
-            self.permitted_eaten_ghosts = perm_eaten_ghosts
+            self.ctd_violations = 0
+            self.permitted_eaten_ghosts = 0
+            for i in add_info:
+                (ctd_viol, perm_eaten_ghosts) = i
+                self.ctd_violations += ctd_viol
+                self.permitted_eaten_ghosts += perm_eaten_ghosts
 
 def create_rule_string_for_pos_neg(shield,shield_rule_nrs):
     rule_string = ''
@@ -128,7 +131,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None,norm=""):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, norm, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -142,7 +145,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
     last_n_states = deque(maxlen=horizon)
     last_n_triggered_rules = deque(maxlen=horizon)
     last_n_triggered_rules.append([])
-    ctd_violations = []
+    ctd_violations = 0
     permitted_eaten_ghosts = 0
 
 
@@ -177,6 +180,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                     if len(activated_created_rules) > 0:
                         action_changes_due_updated_rules += 1
 
+        prev_eaten = env.unwrapped.eaten_ghost
 
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
@@ -200,9 +204,9 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                             f"violation:\n{state}\n"
                         )
                 if norm == "ctd" and tmp_violations > 1:
-                    ctd_violations.append(tmp_violations)
+                    ctd_violations += 1
                     
-        if norm == "permissive" and env.unwrapped.eaten_ghost and True in state.data._eaten[1:]:
+        if norm == "permissive" and prev_eaten and True in last_n_states[-1].data._eaten[1:]:
             permitted_eaten_ghosts += 1
 
         if term and reward > 0:
@@ -214,7 +218,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
     return win, rewards, action_changes, action_changes_due_updated_rules, total_violations, (ctd_violations, permitted_eaten_ghosts)
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1,norm=""):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
@@ -227,9 +231,7 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
     all_violations = []
     add_info = []
     for i in range(nr_eps):
-        #TODO provide norm id
-        win,rewards,action_changes,action_changes_updated,violations,info = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,shield,rule_chooser,change_type,violation_check)
-        win,rewards,action_changes,action_changes_updated,violations,info = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,shield,rule_chooser,change_type,violation_check)
+        win,rewards,action_changes,action_changes_updated,violations,info = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,norm,shield,rule_chooser,change_type,violation_check)
         wins.append(win)
         all_rews.append(rewards)
         all_violations.append(violations)
