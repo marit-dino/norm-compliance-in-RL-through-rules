@@ -30,7 +30,7 @@ Open tasks:
     - [x] add check to ASP (also for oftendeeprl)
     - [x] add norm to pacman clingo helper
     - [ ] check correct update / training process
-    - [ ] fix wrong # violations
+    - [x] fix wrong # violations
     - [x] remove 'moved_north' from feature extractors / rules
 - [x] evaluation: 
   - [x] count violations

@@ -71,7 +71,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values    
 
-            if len(shield.get_blocked_actions(last_n_obs_rules[-1])) == 4:
+            while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4:
                 rule_set_changes_over_period += 1
                 rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
 
@@ -103,8 +103,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
                             f"action: {last_n_actions[j+1]}"
                         )
-                        log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j, len(last_n_violations)))}")
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["eaten_ghost"]))
+                        log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}")
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), len(last_n_states)-j, prev_env_states[j]["eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
