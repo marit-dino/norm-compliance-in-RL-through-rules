@@ -32,6 +32,7 @@ Open tasks:
     - [x] add norm to pacman clingo helper
     - [ ] check correct update / training process
     - [ ] fix wrong # violations
+    - [x] remove 'moved_north' from feature extractors / rules
 - [x] evaluation: 
   - [x] count violations
   - [x] count number of used updated rules

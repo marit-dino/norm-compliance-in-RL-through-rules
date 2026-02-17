@@ -184,7 +184,7 @@ class PacmanEnv(gymnasium.Env):
         }
         self.initial_info['agent_eaten'] = self.game.state.data.agentEatenCnt
         self.eaten_ghost = False
-        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost,False),self.initial_info
+        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost),self.initial_info
 
 
     def step(self, action):
@@ -269,7 +269,7 @@ class PacmanEnv(gymnasium.Env):
         if True in self.game.state.data._eaten[1:]:
             self.eaten_ghost = True
         
-        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost, moved_north), reward, terminated, truncated, info
+        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost), reward, terminated, truncated, info
 
     def get_state(self):
         return self.game.state

@@ -184,7 +184,7 @@ class PacmanEnv(gymnasium.Env):
         
         self.eaten_ghost = False
 
-        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost,False),self.initial_info
+        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost),self.initial_info
 
 
     def step(self, action):
@@ -253,6 +253,7 @@ class PacmanEnv(gymnasium.Env):
             'episode': None,
             # 'ghost_positions': [self.ghostLocations],
             # 'ghost_in_frame': [self.ghostInFrame],
+            'moved_north': moved_north
         }
 
         if self.step_counter >= self.max_ep_len:
@@ -267,16 +268,13 @@ class PacmanEnv(gymnasium.Env):
         if True in self.game.state.data._eaten[1:]:
             self.eaten_ghost = True
 
-        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost, moved_north), reward, terminated, truncated, info
+        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost), reward, terminated, truncated, info
 
     def get_action_meanings(self):
         return [PACMAN_ACTIONS[i] for i in self._action_set]
 
     def get_image(self):
         return self._get_image(crop=False)
-    
-    def get_moved_north(self, obs):
-        return obs[self.features.feature_order.index("moved_north")]
 
 
     # just change the get image function

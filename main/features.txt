@@ -61,7 +61,6 @@ f59: closest-food-dir-1
 f60: closest-food-dir-2
 f61: closest-food-dir-3
 f62: has eaten ghost before
-f63: moved north
 
 actions/direction:
 0: north
