@@ -204,10 +204,10 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                             f"violation:\n{state}\n"
                         )
                 if norm == "ctd" and tmp_violations > 1:
-                    ctd_violations += 1
+                    ctd_violations += tmp_violations / 2
                     
         if norm == "permissive" and prev_eaten and True in last_n_states[-1].data._eaten[1:]:
-            permitted_eaten_ghosts += 1
+            permitted_eaten_ghosts += last_n_states[-1].data._eaten[1:].count(True)
 
         if term and reward > 0:
             win = True # TODO check if true for all environments

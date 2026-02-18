@@ -4,23 +4,23 @@ log = logging.getLogger(__name__)
 
 
 def violated_vegetarian(state):
-    if state.data._eaten[2]:
+    violation_count = state.data._eaten[2:].count(True)
+    if violation_count > 0:
         log.info("norm 'vegetarian' violated")
-        return 1
-    return 0
+    return violation_count
 
 def violated_vegan(state):
-    if True in state.data._eaten[1:]:
+    violation_count = state.data._eaten[1:].count(True)
+    if violation_count > 0:
         log.info("norm 'vegan' violated")
-        return 1
-    return 0
+    return violation_count
 
 
 def violated_permissive(state, eaten_ghost):
-    current_eaten = True in state.data._eaten[1:]
-    if current_eaten and not eaten_ghost:
+    current_eaten_count = state.data._eaten[1:].count(True)
+    if current_eaten_count > 0 and not eaten_ghost:
         log.info("norm 'permissive' violated")
-        return 1
+        return current_eaten_count
     return 0
 
 
@@ -28,7 +28,7 @@ def violated_ctd(state, moved_north):
     viol = violated_vegan(state) 
     if viol > 0 and not moved_north:
         log.info("norm 'ctd' violated")
-        return viol + 1
+        return 2 * viol
     return viol
 
 

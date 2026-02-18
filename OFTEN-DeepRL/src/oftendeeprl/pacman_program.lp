@@ -74,7 +74,7 @@ ok(T) :- {ok(T,G) : G=0..ghosts-1} = ghosts, ok(T-1).
 
 % if ghost eaten -> it cannot be eaten again (in this timeframe)
 goutside(T+1,G) :- bad(T,G).
-goutside(T+1,G) :- goutside(T,G), horizon(T).
+goutside(T+1,G) :- goutside(T,G), T=0..horizon-1.
 
 
 % permissive
