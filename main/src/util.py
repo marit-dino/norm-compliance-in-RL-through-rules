@@ -11,7 +11,7 @@ def get_model_number(cfg):
     """Returns the largest version number such that a model with the given configuration and this number exists.
 
     Args:
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
         int: number of the model to be loaded
@@ -31,7 +31,7 @@ def get_shield_number(cfg):
     """Returns the largest version number such that a shield with the given configuration and this number exists.
 
     Args:
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
         int: number of the shield to be loaded
@@ -51,7 +51,7 @@ def setup_model(cfg):
     """ Loads the model and creates the environment for the given configuration.
 
     Args:
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
         tuple: environment, model, model name, and action tensor

@@ -85,7 +85,7 @@ def prune_rule_set(model, env, action_tensor, feature_extractor, shield, rule_ch
         feature_extractor (FeatureExtractor): feature extractor used for the rule mining step
         shield (AspShield): shield to check whether rules apply
         rule_chooser (RuleChooser): rule chooser for the rules mined in the previous step (+ added updated rules)
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
         RuleSnapshot: snapshot of the pruned rule set
@@ -185,7 +185,7 @@ def add_retaining_rules(rules, shield, rule_chooser, model, env, action_tensor, 
         env (PacmanEnv): environment
         action_tensor (Tensor): tensor containing the available actions
         feature_extractor (FeatureExtractor): the same as used in the rule mining step
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
         RuleSnapshot: snapshot of the new rule set
@@ -254,7 +254,7 @@ def save_rule_set(shield, cfg):
 
     Args:
         shield (AspShield): shield containing the rules to store
-        cfg : config object provided by hydra containing all parameters
+        cfg (DictConfig): config object provided by hydra containing all parameters
     """
     config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     shield_name = f"pickles/shields/uncorr/"\

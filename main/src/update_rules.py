@@ -15,11 +15,18 @@ from collections import deque
 log = logging.getLogger(__name__)
 
 def setup(cfg):
+    """ Loads the environment and model, as well as setups the shield and rule chooser.
+
+    Args:
+        cfg (DictConfig): config object provided by hydra containing all parameters
+
+    Returns:
+        PacmanEnv, model, Tensor, AspShield, RuleChooser: environment, model, action tensor, shield and rule chooser
+    """
     env, model, model_name, action_tensor = setup_model(cfg)
     shield_number = get_shield_number(cfg)
     config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
-    #TODO what is difference between uncorr and improved?
     shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
                            steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
 
@@ -34,6 +41,17 @@ def setup(cfg):
     return env, model, action_tensor, shield, rule_chooser
 
 def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
+    """ Updates the rule set by removing and adding rules in order to reduce the number of violations.
+        The shield and action tensor are modified to contain this updated rule set.
+
+    Args:
+        env (PacmanEnv): environment
+        model : model
+        action_tensor (Tensor): tensor containing the available actions
+        shield (AspShield): shield that is set up with the initially mined rules
+        rule_chooser (RuleChooser): rule chooser that is also set up with the initially mined rules
+        cfg (DictConfig): config object provided by hydra containing all parameters
+    """
     last_n_violations = deque(maxlen=cfg.asp.horizon)
     last_n_obs_rules = deque(maxlen=cfg.asp.horizon)
     last_n_states = deque(maxlen=cfg.asp.horizon)
@@ -150,6 +168,18 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
 
 def backtrack(steps, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules):
+    """ Backtracks a specified number of steps and updates those lists and variables that are affected by this.
+
+    Args:
+        steps (int): steps to backtrack
+        last_n_actions (deque[int]): deque containing the last n taken actions
+        last_n_states (deque[GameState]): deque containing the last n visited states
+        prev_env_states (deque[dict]): deque containing representations of the last n environment configurations
+        env (PacmanEnv): environment
+        last_n_violations (deque[int]): deque containing the number of violations over the last n steps
+        last_n_triggered_rules (deque[list[Rule]]): deque containing the rules that triggered over the last n steps
+        last_n_obs_rules (deque[NDArray]): deque containing the last n observations processed by the feature extractor used for the rules and features_dict_to_array()
+    """
     log.info(f"backtracking {steps} step(s) to:") 
     for i in range(steps):
         prev_env_states.pop()
@@ -163,6 +193,29 @@ def backtrack(steps, last_n_actions, last_n_states, prev_env_states, env, last_n
 
 
 def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations,last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg):
+    """ This method either backtracks or adapts/removes a rule in case all possible actions are currently blocked by rules.
+        If one of the blocking rules was mined, it is adapted/removed to allow the agent to take this action.
+        If none of the blocking rules was mined, we backtrack to the previous state and add a rule which prevents the agent from ending up in this state again.
+
+    Args:
+        last_n_obs_rules (deque[NDArray]): deque containing the last n observations processed by the feature extractor used for the rules and features_dict_to_array()
+        shield (AspShield): shield containing the current rule set
+        rule_chooser (RuleChooser): rule chooser containing the current rule set
+        rules_snapshot (RuleSnapshot): snapshot of the current state of the rule set
+        last_n_actions (deque[int]): deque of the last n actions taken
+        last_n_states (deque[GameState]): deque of the last n visited states
+        last_n_violations (deque[int]): deque of number of violations per state over the last n states
+        last_n_triggered_rules (deque[list[Rule]]): deque containing the triggered rules over the last n steps
+        prev_env_states (deque[dict]): deque containing representations of the last n environment configurations
+        env (PacmanEnv): environment
+        feature_extractor (FeatureExtractor): feature extractor used for the rules
+        model : model
+        action_tensor (Tensor): tensor containing the available actions
+        cfg (DictConfig): config object provided by hydra containing all parameters
+
+    Returns:
+        RuleSnapshot: snapshot of the new rule set
+    """
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(last_n_obs_rules[-1],rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
     neg_actions = [r[0].rule_head.action for r in neg_rules_triggered]
@@ -190,6 +243,23 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
 
 
 def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
+    """ Takes a rule and an observation and makes the rule more specific (may also result in several rules) in order to exclude the application of rule in case of the specified observation.
+
+    Args:
+        mined_rule (Rule): rule which is to be adapted
+        obs_rules (NDArray): observation processed by the feature extractor used for the rules and features_dict_to_array(), this is the observation that will be excluded from the rule body
+        categorical_features (list[int]): list containing the number of those features which are categorical
+        shield (AspShield): shield
+        rule_chooser (RuleChooser): rule chooser
+        cfg (DictConfig): config object provided by hydra containing all parameters
+        model : model
+        env (PacmanEnv): environment
+        action_tensor (Tensor): tensor containing the available actions
+        feature_extractor (FeatureExtractor): feature extractor used for the rules
+
+    Returns:
+        RuleSnapshot: snapshot of the new rule set
+    """
     discretized_features = shield.discretize(obs_rules).astype(int)
 
     feature_facts = {
@@ -226,6 +296,18 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
        
 
 def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
+    """ Adds a negative rule to the rule set, where the body is specified by the given observation.
+
+    Args:
+        obs_rules (NDArray): observation processed by the feature extractor used for the rules and features_dict_to_array(), this is the observation that will form the body of the rule
+        action (int): action that will be in the head of the rule
+        shield (AspShield): shield to which the rule is added
+        rule_chooser (RuleChooser): rule chooser to which the rule is added
+        exclude_features (list[int]): features that are ignored when building the rule body
+
+    Returns:
+        RuleSnapshot: snapshot of the new rule set
+    """
     features_values = obs_rules.copy()
     features_values = shield.discretize(features_values).astype(int)
     relevant_facts = [
@@ -240,6 +322,14 @@ def add_neg_rule(obs_rules, action, shield, rule_chooser, exclude_features):
     return add_rule(None, shield, rule_chooser, rule_str=neg_rule)
 
 def number_of_ghosts(level):
+    """ Returns the number of ghosts in this environment.
+
+    Args:
+        level (string): level descriptor, e.g. smallClassic
+
+    Returns:
+        int: number of ghosts
+    """
     if level.startswith("small"):
         return 2
     else:
