@@ -49,16 +49,17 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     def count_violations(state):
         return check_norms.num_violations_detected(cfg.norm.id, state)
     
-    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon,norm=cfg.norm.id)
+    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon,norm=cfg.norm.id)
 
     log.info(f"Nr. wins: {stats.nr_wins}")
     log.info(f"Avg. reward: {stats.avg_rew} with SE {stats.stderr_rew}")
     log.info(f"Avg. violations: {stats.avg_violations} with SE {stats.stderr_violations}")
     log.info(f"Avg. steps: {stats.avg_steps} with SE {stats.stderr_steps}")
     log.info(f"Avg. action changes: {stats.avg_action_changes} with SE {stats.stderr_action_changes}")
-    log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
+    if updated:
+        log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
     if cfg.norm.id == "ctd":
-        log.info(f"CTD violations: {stats.ctd_violations}")
+        log.info(f"CTD violations: {int(stats.ctd_violations)} out of {int(2*stats.ctd_violations)} total violations")
     if cfg.norm.id == "permissive":
         log.info(f"Permitted eaten ghosts: {stats.permitted_eaten_ghosts}")
     stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}"
