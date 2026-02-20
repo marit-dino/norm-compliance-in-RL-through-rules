@@ -3,8 +3,8 @@ env:
   level: smallClassic
   
 training:
-  steps_initial: 500_000
-  steps_norm: 500_000
+  steps_initial: 750_000
+  steps_norm: 750_000
   algorithm: dqn
   ng_margin: 50
   norm_violation_filtering: True
@@ -20,7 +20,7 @@ rules:
   model_number: 
   shield_number:
   updates:
-    episodes: 350 
+    episodes: 5000 
     data_collection_episodes: 150
     prune_interval: 100
     add_rule_variations: False
@@ -32,7 +32,7 @@ asp:
   radius: 5
 
 eval:
-  nr_episodes: 300
+  nr_episodes: 2000
 
 defaults:
   - norm: vegetarian

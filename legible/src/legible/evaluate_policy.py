@@ -70,12 +70,17 @@ class EvalStats:
         self.nr_wins = sum(wins)
 
         if add_info is not None:
-            self.ctd_violations = 0
-            self.permitted_eaten_ghosts = 0
+            self.ctd_violations = []
+            self.permitted_eaten_ghosts = []
             for i in add_info:
                 (ctd_viol, perm_eaten_ghosts) = i
-                self.ctd_violations += ctd_viol
-                self.permitted_eaten_ghosts += perm_eaten_ghosts
+                self.ctd_violations.append(ctd_viol)
+                self.permitted_eaten_ghosts.append(perm_eaten_ghosts)
+            self.avg_ctd_violations = statistics.mean(self.ctd_violations)
+            self.avg_permitted_eaten_ghosts = statistics.mean(self.permitted_eaten_ghosts)
+            self.stderr_ctd_violations = statistics.stdev(self.ctd_violations) / math.sqrt(nr_eps)
+            self.stderr_permitted_eaten_ghosts = statistics.stdev(self.permitted_eaten_ghosts) / math.sqrt(nr_eps)
+
 
 def create_rule_string_for_pos_neg(shield,shield_rule_nrs):
     rule_string = ''
@@ -204,7 +209,11 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                             f"violation:\n{state}\n"
                         )
                 if norm == "ctd" and tmp_violations > 1:
-                    ctd_violations += tmp_violations / 2
+                    import check_norms
+                    logging.disable(logging.CRITICAL)
+                    vegan_violations = check_norms.violated_vegan(env.unwrapped.game.state)
+                    logging.disable(logging.NOTSET)
+                    ctd_violations += tmp_violations - vegan_violations
                     
         if norm == "permissive" and prev_eaten and True in last_n_states[-1].data._eaten[1:]:
             permitted_eaten_ghosts += last_n_states[-1].data._eaten[1:].count(True)

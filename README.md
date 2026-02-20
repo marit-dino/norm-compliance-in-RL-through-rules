@@ -15,8 +15,8 @@ Open tasks:
     - [x] prune rules only if there have been added enough
     - [x] check why "nothing to update" does not occur anymore
     - [x] deal with the case where pacman gets forbidden to move into a certain direction, but then repeatedly moves into a wall and afterwards eats a ghost
-- [ ] documentation/comments
-- [ ] add more complex norms
+- [x] documentation/comments
+- [x] add more complex norms
   - [x] add to norm check 
   - [x] often deep rl
   - [x] ghost_eaten over time in asp
@@ -24,12 +24,12 @@ Open tasks:
   - [x] check whether it works for larger horizon
   - [x] move feature back to env (oftendeeprl)
   - [x] add more information to evaluation
-  - [ ] CTD:
+  - [x] CTD:
     - [x] check norm violation in update process
     - [x] add flag for moved_north to step() in env 
     - [x] add check to ASP (also for oftendeeprl)
     - [x] add norm to pacman clingo helper
-    - [ ] check correct update / training process
+    - [x] check correct update / training process
     - [x] fix wrong # violations
     - [x] remove 'moved_north' from feature extractors / rules
 - [x] evaluation: 
