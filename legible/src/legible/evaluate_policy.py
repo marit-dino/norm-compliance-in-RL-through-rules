@@ -50,7 +50,11 @@ class EvalStats:
         self.action_changes_relation = []
 
         for i, ac in enumerate(action_changes_list):
-            self.action_changes_relation.append(action_changes_updated_list[i]/ac)
+            if ac != 0:
+                self.action_changes_relation.append(action_changes_updated_list[i]/ac)
+            else:
+                self.action_changes_relation.append(0)
+
         for rewards in all_rews:
             cum_rew = sum(rewards)
             nr_steps = len(rewards)
@@ -153,11 +157,16 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
     ctd_violations = 0
     permitted_eaten_ghosts = 0
 
-
-    rules_snapshot = RuleSnapshot(
-        enforceable_rules = shield.enforceable_rules,
-        cancelable_rules = shield.cancelable_rules,
-    )
+    if shield != None:
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = shield.cancelable_rules,
+        )
+    else:
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = dict(),
+            cancelable_rules = dict(),
+        )
     while True:
         if algo_name == "ppo":
             action, _states = model.predict(obs)
@@ -199,11 +208,17 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                 total_violations += tmp_violations
                 for j, state in enumerate(last_n_states):
                     if horizon - j - 1 != 0: 
-                        log.info(
-                            f"{horizon - j - 1} step(s) before violation:\n{state}\n"
-                            f"triggered rules:\n\t"
-                            f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
-                        )
+                        if use_rule:
+                            log.info(
+                                f"{horizon - j - 1} step(s) before violation:\n{state}\n"
+                                f"triggered rules:\n\t"
+                                f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
+                            )
+                        else:
+                            log.info(
+                                f"{horizon - j - 1} step(s) before violation:\n{state}\n"
+                            )
+
                     else:
                         log.info(
                             f"violation:\n{state}\n"
