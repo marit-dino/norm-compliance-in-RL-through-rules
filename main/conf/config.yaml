@@ -32,7 +32,7 @@ asp:
   radius: 5
 
 eval:
-  nr_episodes: 2000
+  nr_episodes: 3000
 
 defaults:
   - norm: vegetarian
