@@ -330,7 +330,7 @@ def number_of_ghosts(level):
     Returns:
         int: number of ghosts
     """
-    if level.startswith("small"):
+    if level.startswith("small") or level.startswith("medium"):
         return 2
     else:
         return 4
