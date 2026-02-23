@@ -5,12 +5,17 @@ from oftendeeprl.extended_training import parse_level, setup_and_ext_train, get_
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def train_base_model(cfg : DictConfig) -> None:
+    """Trains the base model / policy which will be improved later on and stores it as a pickle.
+       (This contains the two training steps of oftendeeprl, so the policy is already trained on norms after this.)
+
+    Args:
+        cfg (DictConfig): config object provided by hydra containing all parameters
+    """
     # train initial policy
     policy_name = train_pacman(cfg.training.algorithm, cfg.env.name, cfg.training.steps_initial, cfg.env.level, cfg.training.feature_extractor)
     level = parse_level(cfg.env.name, cfg.env.level)
 
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    argument_str = f"--norm{str(cfg.asp.horizon)}-{str(cfg.asp.radius)}-{norm_descriptor}"
+    argument_str = f"--norm{str(cfg.asp.horizon)}-{str(cfg.asp.radius)}-{cfg.norm.id}"
     norm_descriptor, norm_helper = get_norm_helper(cfg.env.name, argument_str, cfg.env.level)
     # train on norms
     model_number = policy_name.removesuffix(".zip").rsplit("_", 1)[-1]

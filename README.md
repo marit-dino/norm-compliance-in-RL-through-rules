@@ -82,6 +82,3 @@ In ECAI 2025 - 28th European Conference on Artificial Intelligence, October 25-3
 Martin Tappler, Ignacio D. Lopez-Miguel, Sebastian Tschiatschek, and Ezio Bartocci. 
 Rule-Guided Reinforcement Learning Policy Evaluation and Improvement. 
 In Proceedings of the Thirty-Fourth International Joint Conference on Artificial Intelligence, IJCAI 2025, Montreal, Canada, August 16-22, 2025, pages 6254–6262. ijcai.org, 2025.
-
-
-

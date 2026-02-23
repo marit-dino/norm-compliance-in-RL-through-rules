@@ -207,11 +207,12 @@ class AspShield(Shield):
         # there can only be one positive
         return True,(pos_triggered[0] if pos_triggered else None,neg_triggered), (pos_rules_triggered, neg_rules_triggered)
 
-    def get_blocked_actions(self, state):
+    def get_blocked_actions(self, state, rules_snapshot):
+        cr = rules_snapshot.cancelable_rules
         features = self.raw_features(state)
         facts = self.raw_features_into_facts(features)
         res = getModels(generation="",
-                        rules=self.all_neg_rules, #"\n".join(self.all_neg_rules),
+                        rules="\n".join(cr.keys()),
                         constraint="",
                         obs=" ".join(facts))
         # there are no choice or generation rules, so only one model will exist
@@ -233,7 +234,7 @@ class AspShield(Shield):
         for i,fi in enumerate(self.feature_indices):
             if fi not in self.categorical_features:
                 enum_interval = enumerate(self.feature_intervals[fi])
-                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) #replace_single_cont_value(fvs[i], fi, enum_interval) TODO can i do this?
+                fvs[i] = replace_single_cont_value(fvs[i], fi, enum_interval) 
         return fvs
 
     def raw_features(self, obs):

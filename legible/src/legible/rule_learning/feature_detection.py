@@ -384,7 +384,7 @@ def harmonize_similar_features(feature_intervals,groups_of_similar):
         print(f"Intervals for {feature}:")
         print(feature_intervals[feature])
 
-def     detect_features(env_name,data, model, nr_features, lime_test_size, action_tensor, nr_features_all, n_actions,algo_name,
+def detect_features(env_name,data, model, nr_features, lime_test_size, action_tensor, nr_features_all, n_actions,algo_name,
                     groups_of_similar,
                     categorical_features=None,
                     sample_reconstruction=None,

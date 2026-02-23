@@ -458,7 +458,7 @@ class ExtendedExtractor8(FeatureExtractor):
         super().__init__(height, width)
         self.legal_neighbor_cache = dict()
 
-    def getFeatures(self, state, action):
+    def getFeatures(self, state, action, eaten_ghost=False):
         # extract the grid of food and wall locations and get the ghost locations
         food = state.getFood()
         walls = state.getWalls()
@@ -491,13 +491,12 @@ class ExtendedExtractor8(FeatureExtractor):
             is_scared = 1 if g.isScared() else 0
             g_x,g_y = g.getPosition()
             features[f"ghost-{i}-scared"] = is_scared
-            features[f"ghost-{i}-scaredtime"] = int(g.scaredTimer / SCARED_TIME)
+            features[f"ghost-{i}-scaredtime"] = g.scaredTimer / SCARED_TIME
             features[f"ghost-{i}-x"] = g_x
             features[f"ghost-{i}-y"] = g_y
             g_dist, g_dir = ghostDistance((x,y),g.getPosition(),walls,legal_neighbor_cache = self.legal_neighbor_cache,return_dir=True)
 
-            #TODO check if this works out (same for scared time)
-            features[f"ghost-{i}-dist"] = int(g_dist)
+            features[f"ghost-{i}-dist"] = g_dist
             # features[f"ghost-{i}-dir"] = g_dir if g_dir is not None else -1
 
             add_direction_ohe(features,g_dir if g_dir is not None else Directions.STOP,f"ghost-{i}-dir")
@@ -563,10 +562,12 @@ class ExtendedExtractor8(FeatureExtractor):
             add_direction_ohe(features,Directions.STOP,"closest-food-dir")
 
         # features["map"] = constract_map_array(self.height,self.width,state)
+        features["prev_ghost_eaten"] = eaten_ghost
+
         return features
 
     def get_obs_space(self,nr_ghosts):
-        other_obs_size = 18
+        other_obs_size = 19
         # map_size = self.width * self.height
         obs_size = other_obs_size + nr_ghosts * 22
         low = np.zeros(obs_size)
@@ -677,14 +678,14 @@ class DeepRLCompleteExtractor(FeatureExtractor):
     def __init__(self, height, width):
         super().__init__(height, width)
         self.legal_neighbor_cache = dict()
-        self.feature_order =  ['closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', '#-of-non-scared-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', '#-of-non-scared-ghosts-le3-step-away', '#-of-scared-ghosts-le3-step-away', '#-of-non-scared-ghosts-1-step-away-0', '#-of-scared-ghosts-1-step-away-0', '#-of-non-scared-ghosts-le3-step-away-0', '#-of-scared-ghosts-le3-step-away-0', 'closest-food-0', '#-of-non-scared-ghosts-1-step-away-1', '#-of-scared-ghosts-1-step-away-1', '#-of-non-scared-ghosts-le3-step-away-1', '#-of-scared-ghosts-le3-step-away-1', 'closest-food-1', '#-of-non-scared-ghosts-1-step-away-2', '#-of-scared-ghosts-1-step-away-2', '#-of-non-scared-ghosts-le3-step-away-2', '#-of-scared-ghosts-le3-step-away-2', 'closest-food-2', '#-of-non-scared-ghosts-1-step-away-3', '#-of-scared-ghosts-1-step-away-3', '#-of-non-scared-ghosts-le3-step-away-3', '#-of-scared-ghosts-le3-step-away-3', 'closest-food-3', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'x', 'y']
+        self.feature_order =  ['closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', '#-of-non-scared-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', '#-of-non-scared-ghosts-le3-step-away', '#-of-scared-ghosts-le3-step-away', '#-of-non-scared-ghosts-1-step-away-0', '#-of-scared-ghosts-1-step-away-0', '#-of-non-scared-ghosts-le3-step-away-0', '#-of-scared-ghosts-le3-step-away-0', 'closest-food-0', '#-of-non-scared-ghosts-1-step-away-1', '#-of-scared-ghosts-1-step-away-1', '#-of-non-scared-ghosts-le3-step-away-1', '#-of-scared-ghosts-le3-step-away-1', 'closest-food-1', '#-of-non-scared-ghosts-1-step-away-2', '#-of-scared-ghosts-1-step-away-2', '#-of-non-scared-ghosts-le3-step-away-2', '#-of-scared-ghosts-le3-step-away-2', 'closest-food-2', '#-of-non-scared-ghosts-1-step-away-3', '#-of-scared-ghosts-1-step-away-3', '#-of-non-scared-ghosts-le3-step-away-3', '#-of-scared-ghosts-le3-step-away-3', 'closest-food-3', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'x', 'y', 'prev_ghost_eaten']
 
-    def obs_from_state(self, state, action):
-        features = self.getFeatures(state, action)
+
+    def obs_from_state(self, state, action, eaten_ghost):
+        features = self.getFeatures(state, action, eaten_ghost)
         return np.array([features[name] for name in self.feature_order])
 
-
-    def getFeatures(self, state, action):
+    def getFeatures(self, state, action, eaten_ghost):
         # extract the grid of food and wall locations and get the ghost locations
         food = state.getFood()
         walls = state.getWalls()
@@ -784,10 +785,12 @@ class DeepRLCompleteExtractor(FeatureExtractor):
         features["x"] = x / self.width
         features["y"] = y / self.height
 
+        features["prev_ghost_eaten"] = eaten_ghost
+
         return features
 
     def get_obs_space(self,nr_ghosts):
-        other_obs_size = 40
+        other_obs_size = 41
         obs_size = other_obs_size + nr_ghosts * 11
         low = np.zeros(obs_size)
         high = np.ones(obs_size)

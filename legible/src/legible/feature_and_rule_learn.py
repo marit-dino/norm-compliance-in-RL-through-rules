@@ -166,7 +166,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                        feature_intervals, categorical_features)
 
     shield_name = f"pickles/shields/{'corr'if corr else 'uncorr'}/"\
-                  f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{nr_features}_{steps_initial}_to_{steps_norm}_shield"
+                  f"{algo_name}__{norm_descriptor}__{env_name.replace('/','_')}_{mode}_feat_{nr_features}_{steps_initial}_to_{steps_norm}_shield"
 
     if exact_model_number is None:
         save_pickle(shield_name,shield)
@@ -218,7 +218,7 @@ def get_features_and_failure_indication(env_name,mode, feature_extractor):
             nr_ghosts = 2
         else:
             raise Exception("Unknown env.")
-        nr_features_all = 18 + nr_ghosts * 22
+        nr_features_all = 19 + nr_ghosts * 22
         if feature_extractor == "extended-9":
             nr_features_all += 8
         categorical_features = list(range(nr_features_all))

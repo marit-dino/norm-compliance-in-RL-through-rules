@@ -3,8 +3,8 @@ env:
   level: smallClassic
   
 training:
-  steps_initial: 500_000
-  steps_norm: 500_000
+  steps_initial: 750_000
+  steps_norm: 750_000
   algorithm: dqn
   ng_margin: 50
   norm_violation_filtering: True
@@ -13,23 +13,26 @@ training:
 rules:
   episodes: 600
   steps: 2500_000
-  nr_features: 62
+  nr_features: 63
   lime_test_size: 100
   compute_correlation: False
   feature_extractor: extended-8
   model_number: 
   shield_number:
   updates:
-    exclude_features_in_neg_rules: [0,1,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,32,33,39,40,41,42,52,53,54,55,56,57,58,59,60,61] # ONLY VEG RIGHT NOW + TODO rename
-    episodes: 250 
-    data_collection_episodes: 100
-    prune_interval: 75
+    episodes: 5000 
+    data_collection_episodes: 150
+    prune_interval: 100
+    add_rule_variations: False
+    prune_rules: False
+
 
 asp:
-  horizon: 2
+  horizon: 3
   radius: 5
 
 eval:
-  nr_episodes: 250
+  episodes: 3000
 
-norms: [vegetarian]
+defaults:
+  - norm: vegetarian
