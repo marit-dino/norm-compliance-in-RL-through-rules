@@ -3,6 +3,7 @@ from gym_pacman_rules.envs.featureExtractors import features_dict_to_array
 from legible.rule_learning.util import save_pickle
 from legible.shield.shields import RuleChooser 
 from legible.create_rules_pacman import string_to_rule
+from util import get_shield_number
 from tqdm import tqdm
 import copy
 
@@ -258,13 +259,16 @@ def save_rule_set(shield, cfg):
     """
     config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     shield_name = f"pickles/shields/uncorr/"\
-                    f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield_updated"
+                    f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
+
 
     if cfg.rules.shield_number is None:
-        save_pickle(shield_name,shield)
+        shield_number = get_shield_number(cfg)    
+        shield_name_updated = f"{shield_name}_{shield_number}_updated"
+        save_pickle(shield_name_updated,shield)
     else:
-        shield_name = f"{shield_name}_updated_{cfg.rules.shield_number}.pkl"
-        save_pickle(shield_name,shield,exact_match=True)
+        shield_name_updated = f"{shield_name}_{cfg.rules.shield_number}_updated"
+        save_pickle(shield_name_updated,shield)
 
 
 def get_action(model, obs, obs_rules, shield, state, rule_chooser, rules_snapshot, algo_name, act_logits, action_tensor):

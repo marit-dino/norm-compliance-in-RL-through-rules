@@ -281,10 +281,14 @@ def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
         shield_name = f"pickles/shields/{shield_type}/" \
                     f"{algo_name}_{env_name.replace('/','_')}_{mode}__{config_str}__feat_{shield_feat}_{steps_initial}_shield"
     else:
-        shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}__{config_str}__{env_name.replace('/','_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
+        if updated:
+            shield_name = f"pickles/shields/{shield_type}/" \
+                    f"{algo_name}__{config_str}__{env_name.replace('/','_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield_{exact_model_number}_updated"
+        else:
+            shield_name = f"pickles/shields/{shield_type}/" \
+                    f"{algo_name}__{config_str}__{env_name.replace('/','_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield"
     
-    if exact_model_number is None:
+    if exact_model_number is None or updated:
         shield = load_pickle(shield_name)
     else:
         shield_name = f"{shield_name}_{exact_model_number}.pkl"
