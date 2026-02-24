@@ -16,12 +16,13 @@ def setup(cfg):
     env, model, model_name, action_tensor = setup_model(cfg)
 
     shield_number = get_shield_number(cfg)
+    config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn",horizon=cfg.asp.horizon,radius=cfg.asp.radius)
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
     
     shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
-                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True,horizon=cfg.asp.horizon,radius=cfg.asp.radius)
+                          steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True, config_str=config_str)
 
     if shield_initial is None:
         sys.exit("Could not load initial shield, check if it exists.")
@@ -46,17 +47,22 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     
     def count_violations(state):
-        return check_norms.num_violations_detected(cfg.norms, state)
+        return check_norms.num_violations_detected(cfg.norm.id, state)
     
-    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.nr_episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon)
+    stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon,norm=cfg.norm.id)
 
     log.info(f"Nr. wins: {stats.nr_wins}")
     log.info(f"Avg. reward: {stats.avg_rew} with SE {stats.stderr_rew}")
     log.info(f"Avg. violations: {stats.avg_violations} with SE {stats.stderr_violations}")
     log.info(f"Avg. steps: {stats.avg_steps} with SE {stats.stderr_steps}")
     log.info(f"Avg. action changes: {stats.avg_action_changes} with SE {stats.stderr_action_changes}")
-    log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
-    stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}"
+    if updated:
+        log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
+    if cfg.norm.id == "ctd":
+        log.info(f"Avg. CTD violations: {stats.avg_ctd_violations} with SE {stats.stderr_ctd_violations}")
+    if cfg.norm.id == "permissive":
+        log.info(f"Avg. permitted eaten ghosts: {stats.avg_permitted_eaten_ghosts} with SE {stats.stderr_permitted_eaten_ghosts}")
+    stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}.pkl"
     save_pickle(stats_path, stats, exact_match=True)
 
 

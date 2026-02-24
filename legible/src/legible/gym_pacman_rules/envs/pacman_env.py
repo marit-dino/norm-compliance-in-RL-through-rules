@@ -99,8 +99,11 @@ class PacmanEnv(gymnasium.Env):
         else:
             self.do_render = "render_mode" in kwargs and kwargs["render_mode"] == "human"
 
+        self.eaten_ghost = False
+        
+
     def setObservationSpace(self):
-        screen_width, screen_height = self.display.calculate_screen_dimensions(self.layout.width,   self.layout.height)
+        screen_width, screen_height = self.display.calculate_screen_dimensions(self.layout.width, self.layout.height)
         self.observation_space = spaces.Box(low=0, high=255,
             shape=(int(screen_height),
                 int(screen_width),
@@ -178,8 +181,10 @@ class PacmanEnv(gymnasium.Env):
             # 'ghost_in_frame': [self.ghostInFrame],
             'step_counter': [[0]],
         }
+        
+        self.eaten_ghost = False
 
-        return self.features.obs_from_state(self.game.state, None),self.initial_info
+        return self.features.obs_from_state(self.game.state, None, self.eaten_ghost),self.initial_info
 
 
     def step(self, action):
@@ -208,12 +213,16 @@ class PacmanEnv(gymnasium.Env):
 
         pacman_action = PACMAN_ACTIONS[action]
 
+        moved_north = False
+
         legal_actions = self.game.state.getLegalPacmanActions()
         illegal_action = False
         if pacman_action not in legal_actions:
             self.illegal_move_counter += 1
             illegal_action = True
             pacman_action = 'Stop' # Stop is always legal
+        elif action == 0:
+            moved_north = True
 
         reward = self.game.step(pacman_action)
         self.cum_reward += reward
@@ -244,6 +253,7 @@ class PacmanEnv(gymnasium.Env):
             'episode': None,
             # 'ghost_positions': [self.ghostLocations],
             # 'ghost_in_frame': [self.ghostInFrame],
+            'moved_north': moved_north
         }
 
         if self.step_counter >= self.max_ep_len:
@@ -255,13 +265,17 @@ class PacmanEnv(gymnasium.Env):
                 'r': self.cum_reward,
                 'l': self.step_counter
             }]
-        return self.features.obs_from_state(self.game.state, action), reward, terminated, truncated, info
+        if True in self.game.state.data._eaten[1:]:
+            self.eaten_ghost = True
+
+        return self.features.obs_from_state(self.game.state, action, self.eaten_ghost), reward, terminated, truncated, info
 
     def get_action_meanings(self):
         return [PACMAN_ACTIONS[i] for i in self._action_set]
 
     def get_image(self):
         return self._get_image(crop=False)
+
 
     # just change the get image function
     def _get_image(self, crop=True):
@@ -355,8 +369,9 @@ class PacmanEnv(gymnasium.Env):
             "location_history": copy.deepcopy(self.location_history),
             "orientation": self.orientation,
             "orientation_history": copy.deepcopy(self.orientation_history),
-            "illegal_move_counter": self.illegal_move_counter
-        }
+            "illegal_move_counter": self.illegal_move_counter,
+            "eaten_ghost": self.eaten_ghost
+            }
     
     def load_state(self, state):
         self.game.state = copy.deepcopy(state["game_state"])
@@ -372,3 +387,4 @@ class PacmanEnv(gymnasium.Env):
         self.location_history = copy.deepcopy(state["location_history"])
         self.orientation = state["orientation"]
         self.orientation_history = copy.deepcopy(state["orientation_history"])
+        self.eaten_ghost = state["eaten_ghost"]

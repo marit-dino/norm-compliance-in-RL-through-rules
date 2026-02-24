@@ -7,10 +7,13 @@ import sys
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def mine_rules(cfg : DictConfig) -> None:
+    """Mines rules from the specified policy (specified by the config) which describe the agents behavior.
 
-    norm_descriptor = f"{'_'.join(cfg.norms)}"
-    config_str = f"{norm_descriptor}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
+    Args:
+        cfg (DictConfig): config object provided by hydra containing all parameters
+    """
 
+    config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
     model_number = ""
     if cfg.rules.model_number is None:

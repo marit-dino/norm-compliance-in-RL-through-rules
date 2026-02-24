@@ -39,7 +39,7 @@ def find_top_k_indices(base_model_name, top_string, return_rew = False):
 
 
 class EvalStats:
-    def __init__(self,all_rews,action_changes_list,action_changes_updated_list,wins,all_violations):
+    def __init__(self,all_rews,action_changes_list,action_changes_updated_list,wins,all_violations,add_info=None):
         self.all_rews = all_rews
         self.action_changes = action_changes_list
         self.action_changes_updated_list = action_changes_updated_list
@@ -48,8 +48,13 @@ class EvalStats:
         self.steps =[]
         nr_eps = len(self.all_rews)
         self.action_changes_relation = []
+
         for i, ac in enumerate(action_changes_list):
-            self.action_changes_relation.append(action_changes_updated_list[i]/ac)
+            if ac != 0:
+                self.action_changes_relation.append(action_changes_updated_list[i]/ac)
+            else:
+                self.action_changes_relation.append(0)
+
         for rewards in all_rews:
             cum_rew = sum(rewards)
             nr_steps = len(rewards)
@@ -67,6 +72,19 @@ class EvalStats:
         self.stderr_action_changes_relation = statistics.stdev(self.action_changes_relation) / math.sqrt(nr_eps)
         self.wins = wins
         self.nr_wins = sum(wins)
+
+        if add_info is not None:
+            self.ctd_violations = []
+            self.permitted_eaten_ghosts = []
+            for i in add_info:
+                (ctd_viol, perm_eaten_ghosts) = i
+                self.ctd_violations.append(ctd_viol)
+                self.permitted_eaten_ghosts.append(perm_eaten_ghosts)
+            self.avg_ctd_violations = statistics.mean(self.ctd_violations)
+            self.avg_permitted_eaten_ghosts = statistics.mean(self.permitted_eaten_ghosts)
+            self.stderr_ctd_violations = statistics.stdev(self.ctd_violations) / math.sqrt(nr_eps)
+            self.stderr_permitted_eaten_ghosts = statistics.stdev(self.permitted_eaten_ghosts) / math.sqrt(nr_eps)
+
 
 def create_rule_string_for_pos_neg(shield,shield_rule_nrs):
     rule_string = ''
@@ -122,7 +140,7 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
         raise Exception("Unsupported")
 
 
-def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
+def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizon, norm, shield : AspShield = None,rule_chooser = None,change_type=None,violation_check=None):
     obs, info = env.reset()
     policy = model.policy
     obs_t, vectorized_env = policy.obs_to_tensor(obs)
@@ -136,12 +154,19 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
     last_n_states = deque(maxlen=horizon)
     last_n_triggered_rules = deque(maxlen=horizon)
     last_n_triggered_rules.append([])
+    ctd_violations = 0
+    permitted_eaten_ghosts = 0
 
-
-    rules_snapshot = RuleSnapshot(
-        enforceable_rules = shield.enforceable_rules,
-        cancelable_rules = shield.cancelable_rules,
-    )
+    if shield != None:
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = shield.enforceable_rules,
+            cancelable_rules = shield.cancelable_rules,
+        )
+    else:
+        rules_snapshot = RuleSnapshot(
+            enforceable_rules = dict(),
+            cancelable_rules = dict(),
+        )
     while True:
         if algo_name == "ppo":
             action, _states = model.predict(obs)
@@ -154,8 +179,7 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
         else:
             raise Exception("Unsupported")
         if use_rule:
-            obs_flat = obs.flatten()
-            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action))
+            obs_rules = features_dict_to_array(feature_extractor.getFeatures(env.unwrapped.game.state,action,env.unwrapped.eaten_ghost))
             triggers,triggered,triggered_rules= shield.does_rule_trigger(obs_rules,rule_chooser, rules_snapshot)
             if triggered_rules == None:
                 triggered_rules = []
@@ -170,10 +194,10 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                     if len(activated_created_rules) > 0:
                         action_changes_due_updated_rules += 1
 
+        prev_eaten = env.unwrapped.eaten_ghost
 
         obs, reward, term, trunc, info = env.step(action)
         last_n_states.append(copy.deepcopy(env.unwrapped.game.state))
-
         obs_t, vectorized_env = policy.obs_to_tensor(obs)
         obs_t = obs_t.to(action_tensor.device)
         rewards.append(reward)
@@ -184,26 +208,41 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
                 total_violations += tmp_violations
                 for j, state in enumerate(last_n_states):
                     if horizon - j - 1 != 0: 
-                        log.info(
-                            f"{horizon - j - 1} step(s) before violation:\n{state}\n"
-                            f"triggered rules:\n\t"
-                            f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
-                        )
+                        if use_rule:
+                            log.info(
+                                f"{horizon - j - 1} step(s) before violation:\n{state}\n"
+                                f"triggered rules:\n\t"
+                                f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
+                            )
+                        else:
+                            log.info(
+                                f"{horizon - j - 1} step(s) before violation:\n{state}\n"
+                            )
+
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
-    
+                if norm == "ctd" and tmp_violations > 1:
+                    import check_norms
+                    logging.disable(logging.CRITICAL)
+                    vegan_violations = check_norms.violated_vegan(env.unwrapped.game.state)
+                    logging.disable(logging.NOTSET)
+                    ctd_violations += tmp_violations - vegan_violations
+                    
+        if norm == "permissive" and prev_eaten and True in last_n_states[-1].data._eaten[1:]:
+            permitted_eaten_ghosts += last_n_states[-1].data._eaten[1:].count(True)
+
         if term and reward > 0:
             win = True # TODO check if true for all environments
         if term or trunc:
             break
 
 
-    return win, rewards, action_changes, action_changes_due_updated_rules, total_violations
+    return win, rewards, action_changes, action_changes_due_updated_rules, total_violations, (ctd_violations, permitted_eaten_ghosts)
 
 
-def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1):
+def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_string = '',shield = None,rule_chooser = None, change_type = None, violation_check=None,horizon=1,norm=""):
     if rule_chooser is not None:
         assert shield is not None
     action_changes_list = []
@@ -214,20 +253,22 @@ def evaluate(env,algo_name, model,nr_eps,action_tensor,feature_extractor, rule_s
     all_rews = []
     wins = []
     all_violations = []
+    add_info = []
     for i in range(nr_eps):
-        win,rewards,action_changes,action_changes_updated,violations = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,shield,rule_chooser,change_type,violation_check)
+        win,rewards,action_changes,action_changes_updated,violations,info = eval_single_eps(env,algo_name,model,action_tensor,feature_extractor,horizon,norm,shield,rule_chooser,change_type,violation_check)
         wins.append(win)
         all_rews.append(rewards)
         all_violations.append(violations)
         action_changes_list.append(action_changes)
         action_changes_updated_list.append(action_changes_updated)
+        add_info.append(info)
 
-    eval_stats = EvalStats(all_rews,action_changes_list,action_changes_updated_list,wins,all_violations)
+    eval_stats = EvalStats(all_rews,action_changes_list,action_changes_updated_list,wins,all_violations,add_info)
     return eval_stats
 
 
 def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
-                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False, horizon="", radius=""):
+                 exact_model_number = None, algo_name = "dqn", steps_norm=0, updated = False, config_str = ""):
     if improved:
         shield_type = "improved"
     else:
@@ -238,10 +279,10 @@ def setup_shield(env_name,mode,steps_initial,shield_feat,improved,random_shield,
 
     if steps_norm == 0:
         shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_shield"
+                    f"{algo_name}_{env_name.replace('/','_')}_{mode}__{config_str}__feat_{shield_feat}_{steps_initial}_shield"
     else:
         shield_name = f"pickles/shields/{shield_type}/" \
-                    f"{algo_name}_{env_name.replace('/','_')}_{mode}{f'_{horizon}_{radius}' if horizon != "" and radius != "" else ""}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
+                    f"{algo_name}__{config_str}__{env_name.replace('/','_')}_{mode}_feat_{shield_feat}_{steps_initial}_to_{steps_norm}_shield{'_updated' if updated else ''}"
     
     if exact_model_number is None:
         shield = load_pickle(shield_name)

@@ -7,18 +7,24 @@ from sb3_ext.clingoHelper import ClingoHelper
 
 class PacmanClingoHelper(ClingoHelper):
 
-    def __init__(self, horizon, radius, ghosts, vegetarian):
+    def __init__(self, horizon, radius, ghosts, norm):
         self.ctl = clingo.Control(
             ["-c", f"horizon={horizon}",
              "-c", f"radius={radius}",
-             "-c", f"ghosts={ghosts}"])
+             "-c", f"ghosts={ghosts}",
+             "-c", f"ctd_flag={1 if norm == 'ctd' else 0}",
+             "-c", f"permissive_flag={1 if norm == 'permissive' else 0}"])
         self.ctl.load('../../OFTEN-DeepRL/src/oftendeeprl/pacman_program.lp')
         self.ctl.ground([("base", [])], context=self)
-
+        
+        self.horizon = horizon
         self.radius = radius
         self.next = None
         self.penalty = 0
-        self.vegetarian = vegetarian
+        self.vegetarian = "vegetarian" == norm
+        self.permissive = "permissive" == norm
+        self.vegan = "vegan" == norm
+        self.ctd = "ctd" == norm
 
     def get_relevant_states(self, state,obs):
         return [(obs,"curr")]
@@ -46,9 +52,11 @@ class PacmanClingoHelper(ClingoHelper):
     def reset_clingo_externals(self, state):
         # reset outside ghosts
         for c, g in enumerate(state.getGhostPositions()):
-            self.ctl.assign_external(Function("goutside", [
-                Number(c)
-            ]), False)
+            for i in range(self.horizon):
+                self.ctl.assign_external(Function("goutside", [
+                    Number(i),
+                    Number(c)
+                ]), False)
         # reset actions
         for a in range(4):
             for r in range(4):
@@ -97,8 +105,12 @@ class PacmanClingoHelper(ClingoHelper):
                     Number(-i),
                     Number(-j)
                 ]), False)
+        
+        for t in range (0, self.horizon):
+            self.ctl.assign_external(Function("eaten_ghost", [Number(t)]), False)
 
-    def set_clingo_externals(self, state, actionValuePairs):
+
+    def set_clingo_externals(self, state, actionValuePairs, eaten_ghost_before):
         midpoint = state.getPacmanPosition()
 
         # walls
@@ -146,10 +158,10 @@ class PacmanClingoHelper(ClingoHelper):
             relative = (g[0] - midpoint[0], g[1] - midpoint[1])
             if abs(relative[0]) > self.radius or abs(
                     relative[1]) > self.radius:
-                self.ctl.assign_external(Function("goutside", [Number(c)]),
+                self.ctl.assign_external(Function("goutside", [Number(0), Number(c)]),
                                          True)
             elif self.vegetarian and c == 0:
-                self.ctl.assign_external(Function("goutside", [Number(c)]),
+                self.ctl.assign_external(Function("goutside", [Number(0), Number(c)]),
                                          True)
             else:
                 self.ctl.assign_external(
@@ -183,7 +195,11 @@ class PacmanClingoHelper(ClingoHelper):
                                               [Number(a),
                                                Number(r)]), True)
 
-    def get_action(self, state, actionValuePairs):
+        if self.permissive and eaten_ghost_before:
+            self.ctl.assign_external(Function("eaten_ghost", [Number(0)]), True)
+
+
+    def get_action(self, state, actionValuePairs, eaten_ghost_before):
         self.next = None
         actionValuePairs = actionValuePairs["curr"]
 
@@ -194,7 +210,7 @@ class PacmanClingoHelper(ClingoHelper):
         # "Optimization-> Windowing" in the main document for more information)
         # Externals include cell information (walls, ghosts) as well as
         # information about policy preferences
-        self.set_clingo_externals(state, actionValuePairs)
+        self.set_clingo_externals(state, actionValuePairs, eaten_ghost_before)
 
         # solve the LP
         self.ctl.solve(on_model=self.on_model)
