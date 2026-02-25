@@ -57,7 +57,7 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
     log.info(f"Avg. steps: {stats.avg_steps} with SE {stats.stderr_steps}")
     log.info(f"Avg. action changes: {stats.avg_action_changes} with SE {stats.stderr_action_changes}")
     if updated:
-        log.info(f"Avg. relation updated / mined rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
+        log.info(f"Avg. relation between total action changes due to rules and action changes due to updated rules: {stats.avg_action_changes_relation} with SE {stats.stderr_action_changes_relation}")
     if cfg.norm.id == "ctd":
         log.info(f"Avg. CTD violations: {stats.avg_ctd_violations} with SE {stats.stderr_ctd_violations}")
     if cfg.norm.id == "permissive":
