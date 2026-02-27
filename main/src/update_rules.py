@@ -27,7 +27,7 @@ def setup(cfg):
     shield_number = get_shield_number(cfg)
     config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
-    shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    shield = setup_shield(cfg.env.name, cfg.level.id, cfg.training.steps_initial, cfg.level.rules.nr_features, False, False, exact_model_number=shield_number,
                            steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
 
     if shield is None:
@@ -73,7 +73,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_triggered_rules.append([])
 
 
-    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norm.id)
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.level.id), cfg.norm.id)
 
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -132,7 +132,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
                     rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[index+1] if r != [] and r[0][0].polarity]
-                    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+                    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.level.id, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
                         if cfg.rules.updates.add_rule_variations:
@@ -235,7 +235,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
         state_features = last_n_obs_rules[-1]
-        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.level.id, cfg.rules.feature_extractor)
         rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
         if cfg.rules.updates.add_rule_variations:
             rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
@@ -270,7 +270,7 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
     rule_copy.mined = False
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
 
-    feature_subset = list(set(range(0, cfg.rules.nr_features)) - set(feature_indices_in_rule) - set(cfg.norm.exclude_features_in_rules))
+    feature_subset = list(set(range(0, cfg.level.rules.nr_features)) - set(feature_indices_in_rule) - set(cfg.norm.exclude_features_in_rules))
 
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():

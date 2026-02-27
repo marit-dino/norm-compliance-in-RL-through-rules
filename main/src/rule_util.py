@@ -259,7 +259,7 @@ def save_rule_set(shield, cfg):
     """
     config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     shield_name = f"pickles/shields/uncorr/"\
-                    f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
+                    f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.level.id}_feat_{cfg.level.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
 
 
     if cfg.rules.shield_number is None:

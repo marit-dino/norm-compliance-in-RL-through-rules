@@ -18,10 +18,10 @@ def setup(cfg):
     shield_number = get_shield_number(cfg)
     config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
-    shield_initial = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    shield_initial = setup_shield(cfg.env.name, cfg.level.id, cfg.training.steps_initial, cfg.level.rules.nr_features, False, False, exact_model_number=shield_number,
                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
     
-    shield_updated = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    shield_updated = setup_shield(cfg.env.name, cfg.level.id, cfg.training.steps_initial, cfg.level.rules.nr_features, False, False, exact_model_number=shield_number,
                           steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", updated=True, config_str=config_str)
 
     if shield_initial is None:

@@ -1,6 +1,5 @@
 env:
   name: BerkeleyPacman-v0
-  level: smallClassic
   
 training:
   steps_initial: 750_000
@@ -13,14 +12,13 @@ training:
 rules:
   episodes: 600
   steps: 2500_000
-  nr_features: 63
   lime_test_size: 100
   compute_correlation: False
   feature_extractor: extended-8
   model_number: 
   shield_number:
   updates:
-    episodes: 5 
+    episodes: 1000
     data_collection_episodes: 150
     prune_interval: 100
     add_rule_variations: False
@@ -32,7 +30,8 @@ asp:
   radius: 5
 
 eval:
-  episodes: 3000
+  episodes: 1500
 
 defaults:
   - norm: vegetarian
+  - level: smallClassic
