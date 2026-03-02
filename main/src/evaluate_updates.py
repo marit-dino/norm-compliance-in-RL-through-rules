@@ -63,8 +63,8 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
         log.info(f"Avg. CTD violations: {stats.avg_ctd_violations} with SE {stats.stderr_ctd_violations}")
     if cfg.norm.id == "permissive":
         log.info(f"Avg. permitted eaten ghosts: {stats.avg_permitted_eaten_ghosts} with SE {stats.stderr_permitted_eaten_ghosts}")
-    stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}_{'_updated' if updated else ''}.pkl"
-    save_pickle(stats_path, stats, exact_match=True)
+    stats_path = f"pickles/eval_stats/{model_name}_{get_model_number(cfg)}{'_updated' if updated else ''}"
+    save_pickle(stats_path, stats)
 
 
 
