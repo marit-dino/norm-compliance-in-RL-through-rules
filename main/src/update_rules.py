@@ -130,7 +130,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 if True in less_violations_possible:
                     rule_set_changes_over_period += 1
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
-                    rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
+                    rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, get_excluded_features(cfg))
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[index+1] if r != [] and r[0][0].polarity]
                     categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.level.id, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
@@ -229,7 +229,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
     if False not in list(actions_blocked_by_created_rules.values()):
         prev_obs = last_n_obs_rules[-2]
         backtrack(len(last_n_states) - 2, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
-        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
+        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
         return rules_snapshot
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
@@ -270,7 +270,7 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
     rule_copy.mined = False
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
 
-    feature_subset = list(set(range(0, cfg.level.rules.nr_features)) - set(feature_indices_in_rule) - set(cfg.norm.exclude_features_in_rules))
+    feature_subset = list(set(range(0, cfg.level.rules.nr_features)) - set(feature_indices_in_rule) - set(get_excluded_features(cfg)))
 
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
@@ -334,6 +334,12 @@ def number_of_ghosts(level):
         return 2
     else:
         return 4
+
+def get_excluded_features(cfg):
+    if "original" in cfg.level.id:
+        return cfg.norm.exclude_features_in_rules_orig
+    else:
+        return cfg.norm.exclude_features_in_rules
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
