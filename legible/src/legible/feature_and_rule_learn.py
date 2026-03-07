@@ -68,7 +68,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                                     feature_extractor_rules = "",
                                     horizon = "",
                                     radius = "",
-                                    algorithm="ripper", min_acc=0.9, min_cov=0.01):
+                                    algorithm="ripper", min_acc=0.94, min_cov=0.01):
 
     # setup stuff
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -143,7 +143,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     print("Learning neg_rules")
     neg_rules = get_rules(X[[f'f{var}' for var in feature_indices_reduced]], target, feature_importances,
                       actions=list(range(num_actions)),obs_data_min_q_index=obs_data_min_q_index,
-                      algorithm=algorithm, MIN_ACC=0.9, MIN_COV=min_cov,negated=True)
+                      algorithm=algorithm, MIN_ACC=min_acc, MIN_COV=min_cov,negated=True)
     print("Learned neg_rules")
     if len(neg_rules)==0:
         raise Exception("No negative rules learned")
