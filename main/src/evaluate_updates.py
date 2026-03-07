@@ -72,6 +72,8 @@ def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg : DictConfig) -> None:
     env, model, model_name, action_tensor, shield_initial, rule_chooser_initial, shield_updated, rule_chooser_updated = setup(cfg)
+    log.info("No rules:")
+    evaluate_rules(env, model, model_name, None, None, action_tensor, cfg)    
     log.info("Original rules:")
     evaluate_rules(env, model, model_name, rule_chooser_initial, shield_initial, action_tensor, cfg)
     log.info("Updated rules:")
