@@ -228,7 +228,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
 
     if False not in list(actions_blocked_by_created_rules.values()):
         prev_obs = last_n_obs_rules[-2]
-        backtrack(len(last_n_states) - 2, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
+        backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
         rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
         return rules_snapshot
     else:
