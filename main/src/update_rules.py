@@ -119,10 +119,10 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"{len(last_n_states) - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
-                            f"action: {last_n_actions[j+1]}"
+                            f"action: {last_n_actions[j+1]}\n"
+                            f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}"
                         )
-                        log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}")
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), len(last_n_states)-j, prev_env_states[j]["eaten_ghost"]))
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
