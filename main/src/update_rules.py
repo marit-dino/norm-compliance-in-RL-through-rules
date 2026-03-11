@@ -227,10 +227,17 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
 
     if False not in list(actions_blocked_by_created_rules.values()):
-        prev_obs = last_n_obs_rules[-2]
-        backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
-        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
-        return rules_snapshot
+        if len(last_n_obs_rules) > 1:
+            prev_obs = last_n_obs_rules[-2]
+            backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
+            rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
+            return rules_snapshot
+        else:
+            action = random.randint(0,3)
+            blocking_rules = [r[0] for r in neg_rules_triggered if r[0].rule_head.action == action]
+            for r in blocking_rules:
+                rules_snapshot =  remove_rule(r, shield, rule_chooser)
+            return rules_snapshot
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
