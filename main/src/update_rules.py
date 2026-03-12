@@ -91,7 +91,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4:
                 rule_set_changes_over_period += 1
-                rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
 
             action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
@@ -228,11 +228,13 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
 
     if False not in list(actions_blocked_by_created_rules.values()):
         if len(last_n_obs_rules) > 1:
+            log.info(f"All actions are blocked by updated rules, backtracking one step.")
             prev_obs = last_n_obs_rules[-2]
             backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
             rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
             return rules_snapshot
         else:
+            log.info(f"All actions are blocked by updated rules and not possible to go back, removing rule(s).")
             action = random.randint(0,3)
             blocking_rules = [r[0] for r in neg_rules_triggered if r[0].rule_head.action == action]
             for r in blocking_rules:
