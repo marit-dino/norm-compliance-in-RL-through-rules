@@ -89,10 +89,13 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values    
 
+            num_backtracks = 0
             while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4:
                 rule_set_changes_over_period += 1
-                rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
-
+                rules_snapshot, backtrack_updated_rules = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                num_backtracks += int(backtrack_updated_rules)
+                if num_backtracks > 10:
+                    break
             action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
@@ -214,7 +217,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
         cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
-        RuleSnapshot: snapshot of the new rule set
+        RuleSnapshot, bool: snapshot of the new rule set, flag signaling that backtracking due to actions being blocked by only updated rules happened
     """
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(last_n_obs_rules[-1],rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
@@ -232,14 +235,14 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
             prev_obs = last_n_obs_rules[-2]
             backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
             rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
-            return rules_snapshot
+            return rules_snapshot, True
         else:
             log.info(f"All actions are blocked by updated rules and not possible to go back, removing rule(s).")
             action = random.randint(0,3)
             blocking_rules = [r[0] for r in neg_rules_triggered if r[0].rule_head.action == action]
             for r in blocking_rules:
                 rules_snapshot =  remove_rule(r, shield, rule_chooser)
-            return rules_snapshot
+            return rules_snapshot, False
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
@@ -248,7 +251,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
         rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
         if cfg.rules.updates.add_rule_variations:
             rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
-        return rules_snapshot
+        return rules_snapshot, False
 
 
 def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
