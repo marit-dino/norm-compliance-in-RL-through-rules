@@ -81,6 +81,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     )
 
     rule_set_changes_over_period = 0
+    num_backtracks = 0
+    last_backtrack = -1
 
     for i in range(cfg.rules.updates.episodes):
         log.info(f"Episode {i+1}/{cfg.rules.updates.episodes}")
@@ -89,13 +91,20 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values    
 
-            num_backtracks = 0
-            while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4:
+            while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4: 
                 rule_set_changes_over_period += 1
+                print(num_backtracks)
                 rules_snapshot, backtrack_updated_rules = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
-                num_backtracks += int(backtrack_updated_rules)
-                if num_backtracks > 10:
+                if backtrack_updated_rules:
+                    num_backtracks += 1
+                    last_backtrack = i
+                if num_backtracks > cfg.asp.horizon * 4:
                     break
+
+            if i - last_backtrack > cfg.asp.horizon:
+                num_backtracks = 0
+                last_backtrack = -1
+            
             action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
@@ -161,6 +170,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 prev_env_states = deque(maxlen=cfg.asp.horizon)
                 prev_env_states.append(env.unwrapped.save_state())
                 last_n_triggered_rules.append([])
+                num_backtracks = 0
+                last_backtrack = -1
                 break
         
         if i % cfg.rules.updates.prune_interval == 0 and i != 0:
