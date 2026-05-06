@@ -18,11 +18,11 @@ rules:
   model_number: 
   shield_number:
   updates:
-    episodes: 7500
+    episodes: 2500
     data_collection_episodes: 250
     prune_interval: 100
     add_rule_variations: False
-    prune_rules: False
+    prune_rules: True
 
 
 asp:
