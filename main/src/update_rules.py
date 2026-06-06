@@ -135,11 +135,12 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"action: {last_n_actions[j+1]}\n"
                             f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}"
                         )
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), cfg.asp.horizon-j, prev_env_states[j]["eaten_ghost"]))
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), cfg.asp.horizon, prev_env_states[j]["eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
+                log.info(f"{less_violations_possible}")
                 if True in less_violations_possible:
                     rule_set_changes_over_period += 1
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
