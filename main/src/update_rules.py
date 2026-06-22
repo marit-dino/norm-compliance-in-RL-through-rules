@@ -93,7 +93,6 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4: 
                 rule_set_changes_over_period += 1
-                print(num_backtracks)
                 if num_backtracks > cfg.asp.horizon * 4:
                     break
 
