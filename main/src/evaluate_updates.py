@@ -46,8 +46,8 @@ def setup(cfg):
 def evaluate_rules(env, model, model_name, rule_chooser, shield, action_tensor, cfg, updated=False):
     feature_extractor = get_feature_extractor(cfg.rules.feature_extractor,env.unwrapped.layout.height, env.unwrapped.layout.width)
     
-    def count_violations(state):
-        return check_norms.num_violations_detected(cfg.norm.id, state)
+    def count_violations(state, ghost_eaten, moved_north):
+        return check_norms.num_violations_detected(cfg.norm.id, state, ghost_eaten, moved_north)
     
     stats = evaluate(env, cfg.training.algorithm, model, cfg.eval.episodes, action_tensor, feature_extractor, '',shield, rule_chooser, "favor_enforce",count_violations,horizon=cfg.asp.horizon,norm=cfg.norm.id)
 
