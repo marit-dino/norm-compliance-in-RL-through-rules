@@ -210,7 +210,6 @@ def eval_single_eps(env, algo_name,model,action_tensor, feature_extractor,horizo
         obs_t = obs_t.to(action_tensor.device)
         rewards.append(reward)
         moved_north = info["moved_north"]
-        prev_eaten = env.unwrapped.eaten_ghost
 
         if violation_check != None:
             tmp_violations = violation_check(env.unwrapped.game.state, prev_eaten, moved_north)
