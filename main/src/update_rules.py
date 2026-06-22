@@ -93,12 +93,14 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
 
             while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4: 
                 rule_set_changes_over_period += 1
+                print(num_backtracks)
+                if num_backtracks > cfg.asp.horizon * 4:
+                    break
+
                 rules_snapshot, backtrack_updated_rules = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
                 if backtrack_updated_rules:
                     num_backtracks += 1
                     last_backtrack = i
-                if num_backtracks > cfg.asp.horizon * 4:
-                    break
 
             if i - last_backtrack > cfg.asp.horizon:
                 num_backtracks = 0
@@ -139,7 +141,6 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"violation:\n{state}\n"
                         )
                 log.info(f"{less_violations_possible}")
-
                 if True in less_violations_possible:
                     rule_set_changes_over_period += 1
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)

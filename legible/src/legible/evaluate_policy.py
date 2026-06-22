@@ -5,6 +5,7 @@ import sys
 import time
 from time import perf_counter
 import numpy as np
+import random
 #import highway_env
 import gym_pacman_rules
 import torch
@@ -124,6 +125,8 @@ def change_action(action, pos_triggered,neg_triggered,algo_name,act_logits,actio
     elif "cancel" == change_type:
         if len(neg_triggered) == 0:
             return None, []
+        if len(neg_triggered) == len(action_tensor):
+            return random.choice(action_tensor), neg_triggered_created_rules
         if algo_name == "ppo":
             for rule_action in neg_triggered:
                 act_logits[rule_action] = -1e6
