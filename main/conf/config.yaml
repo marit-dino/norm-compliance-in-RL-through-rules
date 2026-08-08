@@ -1,0 +1,37 @@
+env:
+  name: BerkeleyPacman-v0
+  
+training:
+  steps_initial: 1_000_000
+  steps_norm: 1_000_000
+  algorithm: dqn
+  ng_margin: 50
+  norm_violation_filtering: True
+  feature_extractor: complete
+
+rules:
+  episodes: 1000
+  steps: 2500_000
+  lime_test_size: 500
+  compute_correlation: False
+  feature_extractor: extended-8
+  model_number: 
+  shield_number:
+  updates:
+    episodes: 2500
+    data_collection_episodes: 500
+    prune_interval: 250
+    add_rule_variations: False
+    prune_rules: True
+
+
+asp:
+  horizon: 3
+  radius: 5
+
+eval:
+  episodes: 3000
+
+defaults:
+  - norm: vegetarian
+  - level: smallClassic
