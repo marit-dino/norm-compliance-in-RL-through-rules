@@ -41,10 +41,10 @@ def extract_actionwise_min_prob(obs_data, model, n_actions,action_tensor):
     return obs_index_for_action
 
 
-def dqn_min_q_selection(obs_data, model, num_actions, action_tensor,sample_reconstruction=None):
+def dqn_min_q_selection(orig_obs_data, model, num_actions, action_tensor,sample_reconstruction=None):
     obs_index_for_action = {k: [] for k in range(num_actions)}
-    for row in range(obs_data.shape[0]):
-        state = obs_data[row][1:].astype(np.float32)
+    for row in range(orig_obs_data.shape[0]):
+        state = orig_obs_data[row][1:].astype(np.float32)
         if sample_reconstruction is not None:
             state = sample_reconstruction(state, 1)
         obs_t, _vectorized_env = model.policy.obs_to_tensor(state)
@@ -68,7 +68,7 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                                     feature_extractor_rules = "",
                                     horizon = "",
                                     radius = "",
-                                    algorithm="ripper", min_acc=0.9, min_cov=0.01):
+                                    algorithm="ripper", min_acc=0.94, min_cov=0.01):
 
     # setup stuff
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -104,9 +104,10 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
                                           try_load=exact_model_number is None)
     nr_experiences = int(sum(len(d.obs) for d in eps_data) / nr_exp_factor)
     print(f"Going to select {nr_experiences} experiences")
-    all_obs_data, eps_data_array,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
+
+    all_obs_data, all_orig_obs_data, eps_data_array, eps_orig_data_array,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                          return_all=True)
-    all_obs_data_failure, eps_data_array_failure,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
+    all_obs_data_failure, all_orig_obs_data_failure, eps_data_array_failure,eps_orig_data_array_failure,_ = get_obs_data_from_eps(env, eps_data, nr_experiences,
                                                                            failure_neighborhood=failure_neighborhood,
                                                                            failure_indicator=failure_indicator,
                                                          return_all=True)
@@ -114,10 +115,12 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     # reselect for failure focus
     if failure_neighborhood > 0:
         eps_data_array = eps_data_array_failure
+        eps_orig_data_array = eps_orig_data_array_failure
         all_obs_data = all_obs_data_failure
+        all_orig_obs_data = all_orig_obs_data_failure
 
     features, feature_intervals, feature_importances = (
-        detect_features(env_name,eps_data_array, model, nr_features, lime_test_size, actions_tensor, nr_features_all,
+        detect_features(env_name,eps_data_array,eps_orig_data_array, model, nr_features, lime_test_size, actions_tensor, nr_features_all,
                             num_actions, algo_name, groups_of_similar=groups_of_similar,
                         categorical_features=categorical_features, compute_correlation=corr,
                         only_features_for_neg=False, sample_reconstruction = sample_reconstruction))
@@ -133,14 +136,14 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
 
     # rule stuff
     eps_data_array_reselected, obs_data_min_q_index = (
-        reselect_data(actions_tensor, algo_name, all_obs_data, eps_data_array, extract_min_prob_neg_data, feature_focus,
+        reselect_data(actions_tensor, algo_name, all_orig_obs_data,eps_data_array, eps_orig_data_array, extract_min_prob_neg_data, feature_focus,
                   model, nr_experiences, sample_reconstruction))
 
     X, target = extract_features_from_obs(eps_data_array_reselected, feature_indices, feature_intervals, categorical_features)
     print("Learning neg_rules")
     neg_rules = get_rules(X[[f'f{var}' for var in feature_indices_reduced]], target, feature_importances,
                       actions=list(range(num_actions)),obs_data_min_q_index=obs_data_min_q_index,
-                      algorithm=algorithm, MIN_ACC=0.9, MIN_COV=min_cov,negated=True)
+                      algorithm=algorithm, MIN_ACC=min_acc, MIN_COV=min_cov,negated=True)
     print("Learned neg_rules")
     if len(neg_rules)==0:
         raise Exception("No negative rules learned")
@@ -177,12 +180,12 @@ def select_features_and_learn_rules(env_name, steps_initial, mode, nr_eps, nr_fe
     return shield,shield_name
 
 
-def reselect_data(actions_tensor, algo_name, all_obs_data, eps_data_array, extract_min_prob_neg_data, feature_focus,
+def reselect_data(actions_tensor, algo_name, all_orig_obs_data, eps_data_array, eps_orig_data_array, extract_min_prob_neg_data, feature_focus,
                   model, nr_experiences, sample_reconstruction = None):
     num_actions = actions_tensor.shape[0]
     obs_data_min_q_index = None
     if feature_focus is not None:
-        eps_data_array_reselected = extract_based_on_focus(all_obs_data, feature_focus, nr_experiences)
+        eps_data_array_reselected = extract_based_on_focus(all_orig_obs_data, feature_focus, nr_experiences)
     else:
         eps_data_array_reselected = eps_data_array
     if algo_name == "ppo" and extract_min_prob_neg_data:
@@ -190,7 +193,7 @@ def reselect_data(actions_tensor, algo_name, all_obs_data, eps_data_array, extra
         obs_data_min_q_index = extract_actionwise_min_prob(eps_data_array_reselected, model, num_actions,
                                                            actions_tensor)
     elif "dqn" in algo_name and extract_min_prob_neg_data:
-        obs_data_min_q_index = dqn_min_q_selection(eps_data_array_reselected, model, num_actions, actions_tensor,sample_reconstruction)
+        obs_data_min_q_index = dqn_min_q_selection(eps_orig_data_array, model, num_actions, actions_tensor,sample_reconstruction)
     return eps_data_array_reselected, obs_data_min_q_index
 
 

@@ -18,7 +18,7 @@ def get_model_number(cfg):
     """
     config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     if cfg.rules.model_number is None:
-        model_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.env.level}_{cfg.training.feature_extractor}"
+        model_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.level.id}_{cfg.training.feature_extractor}"
         norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
                             and f.startswith(model_name)]
         if len(norm_guided_models) == 0:
@@ -38,7 +38,7 @@ def get_shield_number(cfg):
     """
     if cfg.rules.shield_number is None:
         config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
-        shield_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.env.level}_feat_{cfg.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
+        shield_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.level.id}_feat_{cfg.level.rules.nr_features}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_shield"
         shields = [f for f in listdir('pickles/shields/uncorr') if f.startswith(shield_name) and not "updated" in f]
         if len(shields) == 0:
             sys.exit(f"No shield found that matches the provided parameters: {shield_name}")
@@ -58,7 +58,7 @@ def setup_model(cfg):
     """
     config_str = f"{cfg.norm.id}__{cfg.asp.horizon}_{cfg.asp.radius}"
     env, model_name, model_path = create_environment_and_modelname_for_oftendeeprl("norm_guided_dqn", cfg.env.name,
-                                                                                    cfg.env.level, config_str, 
+                                                                                    cfg.level.id, config_str, 
                                                                                     cfg.training.steps_initial, cfg.training.steps_norm,
                                                                                     cfg.training.feature_extractor)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

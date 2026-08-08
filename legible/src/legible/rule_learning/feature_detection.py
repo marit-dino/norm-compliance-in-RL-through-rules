@@ -384,7 +384,7 @@ def harmonize_similar_features(feature_intervals,groups_of_similar):
         print(f"Intervals for {feature}:")
         print(feature_intervals[feature])
 
-def detect_features(env_name,data, model, nr_features, lime_test_size, action_tensor, nr_features_all, n_actions,algo_name,
+def detect_features(env_name,data,orig_data, model, nr_features, lime_test_size, action_tensor, nr_features_all, n_actions,algo_name,
                     groups_of_similar,
                     categorical_features=None,
                     sample_reconstruction=None,
@@ -405,12 +405,14 @@ def detect_features(env_name,data, model, nr_features, lime_test_size, action_te
         le.fit(labels)
         labels = le.transform(labels)
         data = data[:, n_actions:]
+        orig_data = orig_data[:, n_actions:]
     else:
         labels = data[:, 0]
         le = sklearn.preprocessing.LabelEncoder()
         le.fit(labels)
         labels = le.transform(labels)
         data = data[:, 1:]
+        orig_data = orig_data[:, 1:]
     if categorical_features is None:
         categorical_features = range(nr_features_all)
     data = data.astype(float)
@@ -419,6 +421,8 @@ def detect_features(env_name,data, model, nr_features, lime_test_size, action_te
     # set shuffle to false since we need to match with the latent state
     train, test, labels_train, labels_test = sklearn.model_selection.train_test_split(data, labels, train_size=0.80,
                                                                                       shuffle=False)
+    orig_train, orig_test, orig_labels_train, orig_labels_test = sklearn.model_selection.train_test_split(orig_data, labels, train_size=0.80, shuffle=False)
+
     class_names = [f"a{i}" for i in range(n_actions)]
 
     feature_names = [str(i) for i in range(train.shape[1])]
@@ -448,8 +452,9 @@ def detect_features(env_name,data, model, nr_features, lime_test_size, action_te
         if cnt % 10 == 0:
             print(f"Explaining index {cnt}")
         cnt += 1
-        predict_fn = lambda x: predict_act(model, x, action_tensor, sample_reconstruction,algo_name)
-        exp = explainer.explain_instance(test[i], predict_fn, num_features=nr_features, top_labels=
+        predict_fn = lambda x: predict_act(model, reconstruct_orig_obs(x, orig_test[i]), action_tensor, sample_reconstruction,algo_name)
+        
+        exp = explainer.explain_instance(test[i],predict_fn, num_features=nr_features, top_labels=
                                                                                     n_actions if use_all_actions else 3)
         all_discretized_feature_names.extend(exp.domain_mapper.discretized_feature_names)
 
@@ -499,3 +504,32 @@ def detect_features(env_name,data, model, nr_features, lime_test_size, action_te
             detected_features.append((msf, feature_name))
 
     return detected_features, feature_intervals,feature_importances
+
+def reconstruct_orig_obs(lime_batch, orig_row):
+
+    if len(orig_row) > 63:
+        model_features = ['closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', 'ghost-2-scared', 'ghost-2-scaredtime', 'ghost-2-dist', 'ghost-2-dir-0', 'ghost-2-dir-1', 'ghost-2-dir-2', 'ghost-2-dir-3', 'ghost-2-heading-0', 'ghost-2-heading-1', 'ghost-2-heading-2', 'ghost-2-heading-3', 'ghost-3-scared', 'ghost-3-scaredtime', 'ghost-3-dist', 'ghost-3-dir-0', 'ghost-3-dir-1', 'ghost-3-dir-2', 'ghost-3-dir-3', 'ghost-3-heading-0', 'ghost-3-heading-1', 'ghost-3-heading-2', 'ghost-3-heading-3', '#-of-non-scared-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', '#-of-non-scared-ghosts-le3-step-away', '#-of-scared-ghosts-le3-step-away', '#-of-non-scared-ghosts-1-step-away-0', '#-of-scared-ghosts-1-step-away-0', '#-of-non-scared-ghosts-le3-step-away-0', '#-of-scared-ghosts-le3-step-away-0', 'closest-food-0', '#-of-non-scared-ghosts-1-step-away-1', '#-of-scared-ghosts-1-step-away-1', '#-of-non-scared-ghosts-le3-step-away-1', '#-of-scared-ghosts-le3-step-away-1', 'closest-food-1', '#-of-non-scared-ghosts-1-step-away-2', '#-of-scared-ghosts-1-step-away-2', '#-of-non-scared-ghosts-le3-step-away-2', '#-of-scared-ghosts-le3-step-away-2', 'closest-food-2', '#-of-non-scared-ghosts-1-step-away-3', '#-of-scared-ghosts-1-step-away-3', '#-of-non-scared-ghosts-le3-step-away-3', '#-of-scared-ghosts-le3-step-away-3', 'closest-food-3', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'x', 'y', 'prev_ghost_eaten']
+        lime_features = ['x', 'y', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', '#-of-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-x', 'ghost-0-y', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-0-angle-0', 'ghost-0-angle-1', 'ghost-0-angle-2', 'ghost-0-angle-3', 'ghost-0-angle-4', 'ghost-0-angle-5', 'ghost-0-angle-6', 'ghost-0-angle-7', 'ghost-0-angle-8', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-x', 'ghost-1-y', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', 'ghost-1-angle-0', 'ghost-1-angle-1', 'ghost-1-angle-2', 'ghost-1-angle-3', 'ghost-1-angle-4', 'ghost-1-angle-5', 'ghost-1-angle-6', 'ghost-1-angle-7', 'ghost-1-angle-8', 'ghost-2-scared', 'ghost-2-scaredtime', 'ghost-2-x', 'ghost-2-y', 'ghost-2-dist', 'ghost-2-dir-0', 'ghost-2-dir-1', 'ghost-2-dir-2', 'ghost-2-dir-3', 'ghost-2-heading-0', 'ghost-2-heading-1', 'ghost-2-heading-2', 'ghost-2-heading-3', 'ghost-2-angle-0', 'ghost-2-angle-1', 'ghost-2-angle-2', 'ghost-2-angle-3', 'ghost-2-angle-4', 'ghost-2-angle-5', 'ghost-2-angle-6', 'ghost-2-angle-7', 'ghost-2-angle-8', 'ghost-3-scared', 'ghost-3-scaredtime', 'ghost-3-x', 'ghost-3-y', 'ghost-3-dist', 'ghost-3-dir-0', 'ghost-3-dir-1', 'ghost-3-dir-2', 'ghost-3-dir-3', 'ghost-3-heading-0', 'ghost-3-heading-1', 'ghost-3-heading-2', 'ghost-3-heading-3', 'ghost-3-angle-0', 'ghost-3-angle-1', 'ghost-3-angle-2', 'ghost-3-angle-3', 'ghost-3-angle-4', 'ghost-3-angle-5', 'ghost-3-angle-6', 'ghost-3-angle-7', 'ghost-3-angle-8', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'prev_ghost_eaten']
+    else:
+        model_features = ['closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', '#-of-non-scared-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', '#-of-non-scared-ghosts-le3-step-away', '#-of-scared-ghosts-le3-step-away', '#-of-non-scared-ghosts-1-step-away-0', '#-of-scared-ghosts-1-step-away-0', '#-of-non-scared-ghosts-le3-step-away-0', '#-of-scared-ghosts-le3-step-away-0', 'closest-food-0', '#-of-non-scared-ghosts-1-step-away-1', '#-of-scared-ghosts-1-step-away-1', '#-of-non-scared-ghosts-le3-step-away-1', '#-of-scared-ghosts-le3-step-away-1', 'closest-food-1', '#-of-non-scared-ghosts-1-step-away-2', '#-of-scared-ghosts-1-step-away-2', '#-of-non-scared-ghosts-le3-step-away-2', '#-of-scared-ghosts-le3-step-away-2', 'closest-food-2', '#-of-non-scared-ghosts-1-step-away-3', '#-of-scared-ghosts-1-step-away-3', '#-of-non-scared-ghosts-le3-step-away-3', '#-of-scared-ghosts-le3-step-away-3', 'closest-food-3', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'x', 'y', 'prev_ghost_eaten']
+        lime_features = ['x', 'y', 'poss-dir-0', 'poss-dir-1', 'poss-dir-2', 'poss-dir-3', '#-of-ghosts-1-step-away', '#-of-scared-ghosts-1-step-away', 'ghost-0-scared', 'ghost-0-scaredtime', 'ghost-0-x', 'ghost-0-y', 'ghost-0-dist', 'ghost-0-dir-0', 'ghost-0-dir-1', 'ghost-0-dir-2', 'ghost-0-dir-3', 'ghost-0-heading-0', 'ghost-0-heading-1', 'ghost-0-heading-2', 'ghost-0-heading-3', 'ghost-0-angle-0', 'ghost-0-angle-1', 'ghost-0-angle-2', 'ghost-0-angle-3', 'ghost-0-angle-4', 'ghost-0-angle-5', 'ghost-0-angle-6', 'ghost-0-angle-7', 'ghost-0-angle-8', 'ghost-1-scared', 'ghost-1-scaredtime', 'ghost-1-x', 'ghost-1-y', 'ghost-1-dist', 'ghost-1-dir-0', 'ghost-1-dir-1', 'ghost-1-dir-2', 'ghost-1-dir-3', 'ghost-1-heading-0', 'ghost-1-heading-1', 'ghost-1-heading-2', 'ghost-1-heading-3', 'ghost-1-angle-0', 'ghost-1-angle-1', 'ghost-1-angle-2', 'ghost-1-angle-3', 'ghost-1-angle-4', 'ghost-1-angle-5', 'ghost-1-angle-6', 'ghost-1-angle-7', 'ghost-1-angle-8', 'closest-capsule-dist', 'closest-capsule-dir-0', 'closest-capsule-dir-1', 'closest-capsule-dir-2', 'closest-capsule-dir-3', 'closest-food', 'closest-food-dir-0', 'closest-food-dir-1', 'closest-food-dir-2', 'closest-food-dir-3', 'prev_ghost_eaten']
+    
+
+    sorted_lime_features = sorted(lime_features) 
+
+    lime_to_orig_mapping = {}
+    for lime_f_index, f_name in enumerate(sorted_lime_features):
+        if f_name in model_features:
+            orig_f_index = model_features.index(f_name)
+            lime_to_orig_mapping[lime_f_index] = orig_f_index
+
+    reconstructed_batch = []
+
+    for row in lime_batch:
+        rec_obs = orig_row.copy()
+        for lime_f_index, orig_f_index in lime_to_orig_mapping.items():
+            rec_obs[orig_f_index] = row[lime_f_index]
+        reconstructed_batch.append(rec_obs)
+    reconstructed_batch = np.array(reconstructed_batch)
+
+    return reconstructed_batch

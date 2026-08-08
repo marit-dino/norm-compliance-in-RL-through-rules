@@ -27,7 +27,7 @@ def setup(cfg):
     shield_number = get_shield_number(cfg)
     config_str = f"{cfg.norm.id}__{str(cfg.asp.horizon)}_{str(cfg.asp.radius)}"
 
-    shield = setup_shield(cfg.env.name, cfg.env.level, cfg.training.steps_initial, cfg.rules.nr_features, False, False, exact_model_number=shield_number,
+    shield = setup_shield(cfg.env.name, cfg.level.id, cfg.training.steps_initial, cfg.level.rules.nr_features, False, False, exact_model_number=shield_number,
                            steps_norm=cfg.training.steps_norm, algo_name="norm_guided_dqn", config_str=config_str)
 
     if shield is None:
@@ -73,7 +73,7 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     last_n_triggered_rules.append([])
 
 
-    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.env.level), cfg.norm.id)
+    asp_helper = PacmanViolationClingoHelper(cfg.asp.horizon, cfg.asp.radius, number_of_ghosts(cfg.level.id), cfg.norm.id)
 
     rules_snapshot = RuleSnapshot(
         enforceable_rules = shield.enforceable_rules,
@@ -81,6 +81,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
     )
 
     rule_set_changes_over_period = 0
+    num_backtracks = 0
+    last_backtrack = -1
 
     for i in range(cfg.rules.updates.episodes):
         log.info(f"Episode {i+1}/{cfg.rules.updates.episodes}")
@@ -89,10 +91,20 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
             q_values = policy.q_net(obs_t).squeeze()
             act_logits = q_values    
 
-            while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4:
+            while len(shield.get_blocked_actions(last_n_obs_rules[-1], rules_snapshot)) == 4: 
                 rule_set_changes_over_period += 1
-                rules_snapshot = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_obs_rules, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                if num_backtracks > cfg.asp.horizon * 4:
+                    break
 
+                rules_snapshot, backtrack_updated_rules = all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, last_n_actions, last_n_states, last_n_violations, last_n_triggered_rules, prev_env_states, env, feature_extractor, model, action_tensor, cfg)
+                if backtrack_updated_rules:
+                    num_backtracks += 1
+                    last_backtrack = i
+
+            if i - last_backtrack > cfg.asp.horizon:
+                num_backtracks = 0
+                last_backtrack = -1
+            
             action, triggered_rules = get_action(model, obs, last_n_obs_rules[-1], shield, env.unwrapped.game.state, rule_chooser, rules_snapshot, cfg.training.algorithm, act_logits, action_tensor)
             last_n_triggered_rules.append(triggered_rules)
 
@@ -119,20 +131,21 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                             f"{len(last_n_states) - j - 1} step(s) before violation:\n{state}\n"
                             f"triggered rules:\n\t"
                             f"{'\n\t'.join(f'{r[0]}' for rs in last_n_triggered_rules[j+1] for r in rs)}\n"
-                            f"action: {last_n_actions[j+1]}"
+                            f"action: {last_n_actions[j+1]}\n"
+                            f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}"
                         )
-                        log.info(f"Number of violations from this to last state: {sum(itertools.islice(last_n_violations, j+1, len(last_n_violations)))}")
-                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), len(last_n_states)-j, prev_env_states[j]["eaten_ghost"]))
+                        less_violations_possible.append(asp_helper.less_violations_possible(state, sum(itertools.islice(last_n_violations, j+1, len(last_n_violations))), cfg.asp.horizon, prev_env_states[j]["eaten_ghost"]))
                     else:
                         log.info(
                             f"violation:\n{state}\n"
                         )
+                log.info(f"{less_violations_possible}")
                 if True in less_violations_possible:
                     rule_set_changes_over_period += 1
                     index = len(less_violations_possible) - 1 - less_violations_possible[::-1].index(True)
-                    rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
+                    rules_snapshot = add_neg_rule(last_n_obs_rules[index], last_n_actions[index+1], shield, rule_chooser, get_excluded_features(cfg))
                     pos_triggered_rules = [r[0][0] for r in last_n_triggered_rules[index+1] if r != [] and r[0][0].polarity]
-                    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+                    categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.level.id, cfg.rules.feature_extractor)
                     for r in pos_triggered_rules:
                         rules_snapshot = remove_rule(r, shield, rule_chooser)
                         if cfg.rules.updates.add_rule_variations:
@@ -158,6 +171,8 @@ def update_rule_set(env, model, action_tensor, shield, rule_chooser, cfg):
                 prev_env_states = deque(maxlen=cfg.asp.horizon)
                 prev_env_states.append(env.unwrapped.save_state())
                 last_n_triggered_rules.append([])
+                num_backtracks = 0
+                last_backtrack = -1
                 break
         
         if i % cfg.rules.updates.prune_interval == 0 and i != 0:
@@ -214,7 +229,7 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
         cfg (DictConfig): config object provided by hydra containing all parameters
 
     Returns:
-        RuleSnapshot: snapshot of the new rule set
+        RuleSnapshot, bool: snapshot of the new rule set, flag signaling that backtracking due to actions being blocked by only updated rules happened
     """
     triggers,triggered_actions, triggered_rules = shield.does_rule_trigger(last_n_obs_rules[-1],rule_chooser,rules_snapshot)
     (pos_rules_triggered, neg_rules_triggered) = triggered_rules
@@ -227,19 +242,28 @@ def all_actions_blocked(last_n_obs_rules, shield, rule_chooser, rules_snapshot, 
             actions_blocked_by_created_rules[r[0].rule_head.action] = False
 
     if False not in list(actions_blocked_by_created_rules.values()):
-        prev_obs = last_n_obs_rules[-2]
-        backtrack(len(last_n_states) - 2, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
-        rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, cfg.norm.exclude_features_in_rules)
-        return rules_snapshot
+        if len(last_n_obs_rules) > 1:
+            log.info(f"All actions are blocked by updated rules, backtracking one step.")
+            prev_obs = last_n_obs_rules[-2]
+            backtrack(1, last_n_actions, last_n_states, prev_env_states, env, last_n_violations, last_n_triggered_rules, last_n_obs_rules)
+            rules_snapshot = add_neg_rule(prev_obs, last_n_actions[-1], shield, rule_chooser, get_excluded_features(cfg))
+            return rules_snapshot, True
+        else:
+            log.info(f"All actions are blocked by updated rules and not possible to go back, removing rule(s).")
+            action = random.randint(0,3)
+            blocking_rules = [r[0] for r in neg_rules_triggered if r[0].rule_head.action == action]
+            for r in blocking_rules:
+                rules_snapshot =  remove_rule(r, shield, rule_chooser)
+            return rules_snapshot, False
     else:
         log.info(f"All actions are blocked, adapting a mined rule")
         mined_neg_rule = max(list(filter(lambda r: r[0].mined == True, neg_rules_triggered)), key=lambda r: len(r[0].rule_body.conditions))[0]
         state_features = last_n_obs_rules[-1]
-        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.env.level, cfg.rules.feature_extractor)
+        categorical_features, failure_indicator, nr_features_all, sample_reconstruction, groups_of_similar = get_features_and_failure_indication(cfg.env.name, cfg.level.id, cfg.rules.feature_extractor)
         rules_snapshot = remove_rule(mined_neg_rule, shield, rule_chooser)
         if cfg.rules.updates.add_rule_variations:
             rules_snapshot = add_differing_enumerable_features(mined_neg_rule, state_features, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor)
-        return rules_snapshot
+        return rules_snapshot, False
 
 
 def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features, shield, rule_chooser, cfg, model, env, action_tensor, feature_extractor):
@@ -270,7 +294,7 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
     rule_copy.mined = False
     feature_indices_in_rule = [f.feature for f in mined_rule.rule_body.conditions]
 
-    feature_subset = list(set(range(0, cfg.rules.nr_features)) - set(feature_indices_in_rule) - set(cfg.norm.exclude_features_in_rules))
+    feature_subset = list(set(range(0, cfg.level.rules.nr_features)) - set(feature_indices_in_rule) - set(get_excluded_features(cfg)))
 
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
@@ -334,6 +358,12 @@ def number_of_ghosts(level):
         return 2
     else:
         return 4
+
+def get_excluded_features(cfg):
+    if "original" in cfg.level.id:
+        return cfg.norm.exclude_features_in_rules_orig
+    else:
+        return cfg.norm.exclude_features_in_rules
 
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")

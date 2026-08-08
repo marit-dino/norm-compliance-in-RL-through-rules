@@ -17,7 +17,7 @@ def mine_rules(cfg : DictConfig) -> None:
 
     model_number = ""
     if cfg.rules.model_number is None:
-        model_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.env.level}_{cfg.training.feature_extractor}"
+        model_name = f"norm_guided_dqn__{config_str}__{cfg.env.name.replace('/', '_')}_{cfg.training.steps_initial}_to_{cfg.training.steps_norm}_level_{cfg.level.id}_{cfg.training.feature_extractor}"
         norm_guided_models = [f for f in listdir('./pickles/models') if isfile(join('./pickles/models', f)) 
                             and f.startswith(model_name)]
         if len(norm_guided_models) == 0:
@@ -26,8 +26,8 @@ def mine_rules(cfg : DictConfig) -> None:
     else: 
         model_number = cfg.rules.model_number
 
-    feature_and_rule_learn.select_features_and_learn_rules(cfg.env.name, cfg.training.steps_initial, cfg.env.level, cfg.rules.episodes,
-                                                           cfg.rules.nr_features, cfg.rules.lime_test_size, cfg.rules.compute_correlation,
+    feature_and_rule_learn.select_features_and_learn_rules(cfg.env.name, cfg.training.steps_initial, cfg.level.id, cfg.rules.episodes,
+                                                           cfg.level.rules.nr_features, cfg.rules.lime_test_size, cfg.rules.compute_correlation,
                                                             "norm_guided_dqn", cfg.training.feature_extractor, exact_model_number=model_number, steps_norm=cfg.training.steps_norm,
                                                             horizon=cfg.asp.horizon, radius=cfg.asp.radius,norm_descriptor=config_str, feature_extractor_rules=cfg.rules.feature_extractor)    
 

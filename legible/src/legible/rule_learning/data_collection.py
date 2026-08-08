@@ -15,6 +15,7 @@ from torch.nn import functional as F
 @dataclass
 class EpisodeData:
     obs : list
+    orig_obs: list
     act_logits : list
     est_values : list
     actions : list
@@ -35,9 +36,10 @@ def generate_episode_data(env, model, algo_name, action_tensor, feature_extracto
     else:
         raise Exception("Unsupported")
 
-    data = EpisodeData([],[], [],[],[])
+    data = EpisodeData([],[],[],[],[],[])
     data.act_logits.append(act_logits)
     data.est_values.append(estimated_value)
+    data.orig_obs.append(obs)
 
     if feature_extractor_id == "extended-8":
         eaten_ghost = env.unwrapped.eaten_ghost
@@ -68,6 +70,8 @@ def generate_episode_data(env, model, algo_name, action_tensor, feature_extracto
         else:
             eaten_ghost = False
         data.obs.append(feature_extractor.getFeatures(state=env.unwrapped.game.state, action=action, eaten_ghost=eaten_ghost))
+        data.orig_obs.append(obs)
+        
         if term and reward <= 0:
             data.rewards.append(min(-1,reward))
         else:
@@ -171,6 +175,7 @@ def get_obs_data_from_eps(env, eps_data, nr_data_points, failure_neighborhood = 
                           return_all=False):
     assert (not (failure_neighborhood > 0)) or failure_indicator is not None
     obs_data = []
+    orig_obs_data = []
     act_logit_data = []
     if failure_neighborhood > 0:
         eps_data = filter_eps_for_failing(eps_data,failure_indicator)
@@ -182,17 +187,23 @@ def get_obs_data_from_eps(env, eps_data, nr_data_points, failure_neighborhood = 
                 act_logits = e.act_logits[i]
                 act_logit_data.append(act_logits.cpu().numpy())
                 obs = e.obs[i]
+                orig_obs = e.orig_obs[i]
                 obs_flat = np.array([obs[j] for j in obs.keys()])
+                orig_obs_flat = orig_obs.flatten()
                 value = e.est_values[i] if isinstance(e.est_values[i],float) else e.est_values[i].item()
                 if act_probs_for_label:
                     label = tc.softmax(act_logits,0)
                     row = np.concatenate((label.cpu().numpy(), obs_flat))
+                    orig_row = np.concatenate((label.cpu().numpy(), orig_obs_flat))
                 else:
                     label = tc.argmax(act_logits)
                     row = np.concatenate((np.array([label.data.cpu().numpy()]),obs_flat))
+                    orig_row = np.concatenate((np.array([label.data.cpu().numpy()]),orig_obs_flat))
 
                 obs_data.append((row, value))
+                orig_obs_data.append((orig_row, value))
     all_obs_data = [r for r,v in obs_data]
+    all_orig_obs_data = [r for r,v in orig_obs_data]
     if failure_neighborhood > 0:
         print(f"We have {len(all_obs_data)} data points in the neighborhood of failures")
 
@@ -201,11 +212,12 @@ def get_obs_data_from_eps(env, eps_data, nr_data_points, failure_neighborhood = 
     else:
         choice_indices = range(len(obs_data))
     obs_data = [obs_data[i][0] for i in choice_indices]
+    orig_obs_data = [orig_obs_data[i][0] for i in choice_indices]
     act_logit_data = [act_logit_data[i] for i in choice_indices]
     if return_all:
-        return all_obs_data,np.array(obs_data),np.array(act_logit_data)
+        return all_obs_data,all_orig_obs_data,np.array(obs_data),np.array(orig_obs_data),np.array(act_logit_data)
     else:
-        return np.array(obs_data)
+        return np.array(obs_data),np.array(orig_obs_data)
 
 def extract_based_on_importance(all_obs_data, q_val_calculator, nr_data_points):
     obs_data_with_imp = []
