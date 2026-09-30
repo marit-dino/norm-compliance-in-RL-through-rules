@@ -298,12 +298,7 @@ def add_differing_enumerable_features(mined_rule,obs_rules, categorical_features
 
     adapted_rules = [rule_copy]
     for fi in feature_facts.keys():
-        if fi not in feature_subset:
-            continue
-        elif fi in categorical_features:
-            for i,r in enumerate(adapted_rules):
-                adapted_rules[i] = r.add_feature(fi, abs(feature_facts[fi]-1))
-        else:
+        if fi in feature_subset:
             tmp_rule_list = []
             for i,r in enumerate(adapted_rules):
                 for interval,(l,u) in enumerate(shield.feature_intervals[fi]):
